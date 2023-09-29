@@ -1,6 +1,6 @@
 <script>
 import { onMount, onDestroy } from 'svelte';
-import { Text, Progress } from '@svelteuidev/core';
+import { Stack, Text, Progress } from '@svelteuidev/core';
 
 export let id;
 
@@ -38,12 +38,14 @@ onDestroy(() => {
 
 {#if pollData}
   <h2>{pollData.question}</h2>
+  <Stack override={{ height: 200 }}>
     {#each pollData.responses as response (response.id)}
     <Text size='xl' weight='bold' color='blue'>
       {response.text}
     </Text>
     <Progress size={30} value={(response.votes / totalVotes) * 100 } label={response.votes } striped />
     {/each}
+    </Stack>
 {:else}
   <p>Loading...</p>
 {/if}

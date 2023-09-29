@@ -1,7 +1,7 @@
 <script>
 import { onMount } from "svelte";
 import { navigate } from "svelte-routing";
-import { Container, Space, Button, RadioGroup } from "@svelteuidev/core";
+import { Space, Stack, Button, RadioGroup } from "@svelteuidev/core";
 
 export let id;
 
@@ -43,11 +43,11 @@ async function submitVotes() {
 
 {#if pollData}
 <h2>{pollData.question}</h2>
-
 <form on:submit|preventDefault={submitVotes}>
-<RadioGroup bind:group={selectedOption} items={responseData} direction={'column'} labelDirection={'left'} checked={false} /> 
-<Space /> 
+<Stack override={{ height: 200 }} >
+<RadioGroup size='xl' bind:group={selectedOption} items={responseData} direction={'column'} labelDirection={'left'} checked={false} /> 
 <Button type="submit">Vote</Button>
+</Stack>
 </form>
 {:else}
 <p>Loading...</p>
