@@ -48,7 +48,7 @@ async function goToResults() {
 {#if pollData}
 <h2>{pollData.question}</h2>
 <form on:submit|preventDefault={submitVotes}>
-<Stack override={{ height: 200 }} >
+<Stack>
 <RadioGroup size='xl' bind:group={selectedOption} items={responseData} direction={'column'} labelDirection={'left'} checked={false} /> 
 <Button type="submit">Vote</Button><Button type="button" on:click={goToResults}>Results</Button>
 </Stack>
