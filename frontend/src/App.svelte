@@ -9,6 +9,10 @@ import HeadContent from "./HeadContent.svelte";
 
 </script>
 
+<svelte:head>
+  <title>Poller Bear</title>
+</svelte:head>
+
 <SvelteUIProvider withGlobalStyles themeObserver={"dark"}>
 <AppShell>
 <Header slot="header">
