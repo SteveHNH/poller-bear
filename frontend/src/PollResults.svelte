@@ -38,7 +38,7 @@ onDestroy(() => {
 
 {#if pollData}
   <h2>{pollData.question}</h2>
-  <Stack override={{ height: 200 }}>
+  <Stack>
     {#each pollData.responses as response (response.id)}
     <Text size='xl' weight='bold' color='blue'>
       {response.text}
