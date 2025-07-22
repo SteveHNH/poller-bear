@@ -34,9 +34,9 @@ func InitializeDatabaseConnection(cfg *config.Config) {
   if cfg.DatabaseImpl == "postgres" {
     DB, err = initializePostgresConnection(cfg)
     if err != nil {
-      fmt.Print("Unable to connect to database", err)
+      panic(fmt.Sprintf("Unable to connect to database: %v", err))
     }
-    fmt.Print("Connected to DB")
+    fmt.Println("Connected to DB")
   } else {
     panic("Invalid database impl requested")
   }
