@@ -9,6 +9,7 @@ type Poll struct {
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	Question  string         `gorm:"type:varchar(512);not null" json:"question"`
+	LimitVotes bool          `gorm:"default:false" json:"limit_votes"`
 	Responses []PollResponse `gorm:"foreignKey:PollID" json:"responses"`
 }
 
@@ -22,7 +23,9 @@ type PollResponse struct {
 }
 
 type VoteRecord struct {
-  ID uint `gorm:"primaryKey"`
-  PollID uint `gorm:"foreignKey:PollID"`
-  CookieUUID string `gorm:"type:varchar(36);not null"`
+  ID         uint      `gorm:"primaryKey" json:"id"`
+  CreatedAt  time.Time `json:"created_at"`
+  UpdatedAt  time.Time `json:"updated_at"`
+  PollID     uint      `gorm:"not null" json:"poll_id"`
+  SessionID  string    `gorm:"type:varchar(128);not null" json:"session_id"`
 }
