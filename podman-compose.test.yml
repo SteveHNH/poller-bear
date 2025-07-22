@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: docker.io/postgres:15-alpine
+    container_name: poller-bear-test-db
+    environment:
+      POSTGRES_USER: poller
+      POSTGRES_PASSWORD: poller
+      POSTGRES_DB: poller_bear
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poller -d poller_bear"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+volumes:
+  test_postgres_data:
+
+networks:
+  test-network:
+    driver: bridge
