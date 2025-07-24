@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@svelteuidev/composables": "^0.15.3",
-    "@svelteuidev/core": "^0.15.3",
+    "@svelteuidev/composables": "^0.15.7",
+    "@svelteuidev/core": "^0.15.7",
     "@svelteuidev/motion": "^0.15.3",
     "radix-icons-svelte": "^1.2.1"
   }

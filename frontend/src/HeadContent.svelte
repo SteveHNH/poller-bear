@@ -1,11 +1,11 @@
 <script>
 import { Header, Group, Button } from '@svelteuidev/core';
-import { getLocation } from 'svelte-routing';
+import { useLocation } from 'svelte-routing';
 
-const location = getLocation();
+const location = useLocation();
 
 // Show Create Poll button only on poll pages (/polls/id or /polls/id/r)
-$: showCreateButton = $location.pathname.startsWith('/polls/');
+$: showCreateButton = $location && $location.pathname ? $location.pathname.startsWith('/polls/') : false;
 </script>
 
 <div class="modern-header">
