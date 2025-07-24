@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17
+    security_opt:
+      - no-new-priveleges:true
+    container_name: poller-bear-db
+    hostname: poller-bear-db
+    environment:
+      POSTGRES_USER: poller
+      POSTGRES_PASSWORD: poller
+      POSTGRES_DB: poller_bear
+      TZ: America/New_York
+    volumes:
+      - /volume1/docker/poller-bear/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-U", "poller", "-d", "poller_bear"]
+      interval: 10s
+      timeout: 45s
+      retries: 10 
+    restart: on-failure:5 
+
+  poller-bear:
+    image: quay.io/sadams/poller-bear:latest
+    container_name: poller-bear-app
+    hostname: poller-bear
+    user: 0:0
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DATABASE_HOST: poller-bear-db
+      DATABASE_PORT: 5432
+      DATABASE_USER: poller
+      DATABASE_PASS: poller
+      DATABASE_NAME: poller_bear
+    ports:
+      - "9008:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
