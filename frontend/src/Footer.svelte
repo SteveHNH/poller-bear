@@ -12,7 +12,7 @@ import { GithubLogo } from 'radix-icons-svelte';
           <span class="footer-name">Poller Bear</span>
         </div>
         <Text size="sm" color="dimmed" class="footer-description">
-          Create polls in seconds, get results instantly. Simple, fast, and beautiful polling for everyone.
+          Create polls in seconds, get results instantly. Simple, fast polling for everyone.
         </Text>
       </div>
 
@@ -37,10 +37,10 @@ import { GithubLogo } from 'radix-icons-svelte';
       <div class="footer-divider"></div>
       <div class="bottom-content">
         <Text size="xs" color="dimmed">
-          © 2024 Poller Bear. Made with ❤️ for the community.
+          © 2025 Poller Bear
         </Text>
         <Text size="xs" color="dimmed">
-          Open source and free forever.
+          Open source. Patches welcome.
         </Text>
       </div>
     </div>

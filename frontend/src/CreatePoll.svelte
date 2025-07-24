@@ -168,9 +168,6 @@ import { Button, TextInput, Checkbox, Text, Card, Badge, ActionIcon, Stack, Grou
             {isSubmitting ? '🚀 Creating Your Poll...' : '🎉 Create My Poll!'}
           </Button>
           
-          <Text size="xs" color="dimmed" align="center" class="submit-help">
-            Your poll will be ready to share immediately after creation
-          </Text>
         </div>
 
       </Stack>
