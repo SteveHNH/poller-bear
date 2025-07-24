@@ -5,7 +5,8 @@
       "Bash(go mod:*)",
       "Bash(go build:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }
