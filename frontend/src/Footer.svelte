@@ -1,30 +1,6 @@
 <script>
 import { Button, Group, Text } from '@svelteuidev/core';
 import { GithubLogo } from 'radix-icons-svelte';
-import { onMount } from 'svelte';
-
-onMount(() => {
-  // Load Ko-fi widget script
-  const script1 = document.createElement('script');
-  script1.type = 'text/javascript';
-  script1.src = 'https://storage.ko-fi.com/cdn/widget/Widget_2.js';
-  document.head.appendChild(script1);
-  
-  script1.onload = () => {
-    // Initialize Ko-fi widget
-    window.kofiwidget2.init('Buy me a coffee', '705ebd', 'F1F61IKDJT');
-    window.kofiwidget2.draw();
-    
-    // Move the Ko-fi widget to our container
-    setTimeout(() => {
-      const kofiButton = document.getElementById('kofiShortcode705ebd');
-      const container = document.getElementById('kofi-widget-container');
-      if (kofiButton && container) {
-        container.appendChild(kofiButton);
-      }
-    }, 100);
-  };
-});
 </script>
 
 <footer class="modern-footer">
@@ -42,20 +18,17 @@ onMount(() => {
 
       <div class="footer-links">
         <div class="links-section">
-          <Group spacing="md">
-            <Button
-              variant="subtle"
-              size="sm"
-              leftIcon={GithubLogo}
-              component="a"
-              href="https://www.github.com/SteveHNH/poller-bear"
-              target="_blank"
-              class="github-button"
-            >
-              GitHub
-            </Button>
-            <div id="kofi-widget-container"></div>
-          </Group>
+          <Button
+            variant="subtle"
+            size="sm"
+            leftIcon={GithubLogo}
+            component="a"
+            href="https://www.github.com/SteveHNH/poller-bear"
+            target="_blank"
+            class="github-button"
+          >
+            GitHub
+          </Button>
         </div>
       </div>
     </div>
@@ -153,23 +126,6 @@ onMount(() => {
     box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
   }
 
-  #kofi-widget-container {
-    display: flex;
-    align-items: center;
-  }
-
-  /* Style Ko-fi button to match footer theme */
-  :global(#kofi-widget-container iframe) {
-    border-radius: 6px !important;
-    overflow: hidden !important;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15)) !important;
-    transition: all 0.3s ease !important;
-  }
-
-  :global(#kofi-widget-container iframe:hover) {
-    transform: translateY(-2px) !important;
-    filter: drop-shadow(0 4px 15px rgba(0,0,0,0.2)) !important;
-  }
 
   .footer-bottom {
     margin-top: 2rem;
