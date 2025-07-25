@@ -18,17 +18,29 @@ import { GithubLogo } from 'radix-icons-svelte';
 
       <div class="footer-links">
         <div class="links-section">
-          <Button
-            variant="subtle"
-            size="sm"
-            leftIcon={GithubLogo}
-            component="a"
-            href="https://www.github.com/SteveHNH/poller-bear"
-            target="_blank"
-            class="github-button"
-          >
-            GitHub
-          </Button>
+          <Group spacing="md">
+            <Button
+              variant="subtle"
+              size="sm"
+              leftIcon={GithubLogo}
+              component="a"
+              href="https://www.github.com/SteveHNH/poller-bear"
+              target="_blank"
+              class="github-button"
+            >
+              GitHub
+            </Button>
+            <Button
+              variant="subtle"
+              size="sm"
+              component="a"
+              href="https://ko-fi.com/F1F61IKDJT"
+              target="_blank"
+              class="kofi-button"
+            >
+              ☕ Buy me a coffee
+            </Button>
+          </Group>
         </div>
       </div>
     </div>
@@ -108,7 +120,8 @@ import { GithubLogo } from 'radix-icons-svelte';
     align-items: center;
   }
 
-  :global(.github-button) {
+  :global(.github-button),
+  :global(.kofi-button) {
     background: rgba(255, 255, 255, 0.1) !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     color: rgba(255, 255, 255, 0.9) !important;
@@ -118,12 +131,23 @@ import { GithubLogo } from 'radix-icons-svelte';
     justify-self: flex-start !important;
   }
 
-  :global(.github-button:hover) {
+  :global(.github-button:hover),
+  :global(.kofi-button:hover) {
     background: rgba(255, 255, 255, 0.2) !important;
     border-color: rgba(255, 255, 255, 0.4) !important;
     color: white !important;
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+  }
+
+  :global(.kofi-button) {
+    background: rgba(255, 193, 7, 0.15) !important;
+    border-color: rgba(255, 193, 7, 0.3) !important;
+  }
+
+  :global(.kofi-button:hover) {
+    background: rgba(255, 193, 7, 0.25) !important;
+    border-color: rgba(255, 193, 7, 0.5) !important;
   }
 
 
