@@ -2,6 +2,7 @@ package integration
 
 import (
 	"net/http"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -330,6 +331,179 @@ var _ = Describe("Polling API Integration Tests", func() {
 		})
 	})
 
+	Describe("Poll Duration and Expiration", func() {
+		Context("when creating polls with duration", func() {
+			It("should create a poll with expiration time", func() {
+				resp, err := testServer.CreatePollWithDuration(
+					"What's your favorite framework?",
+					false,
+					[]string{"React", "Vue", "Angular"},
+					24, // 24 hours
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var poll models.Poll
+				err = helpers.ParseJSONResponse(resp, &poll)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(poll.Question).To(Equal("What's your favorite framework?"))
+				Expect(poll.ExpiresAt).NotTo(BeNil())
+				Expect(*poll.ExpiresAt).To(BeTemporally(">", time.Now()))
+				Expect(*poll.ExpiresAt).To(BeTemporally("<", time.Now().Add(25*time.Hour)))
+			})
+
+			It("should create a poll without expiration when duration is not provided", func() {
+				resp, err := testServer.CreatePoll(
+					"What's your favorite language?",
+					false,
+					[]string{"Go", "Python", "JavaScript"},
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var poll models.Poll
+				err = helpers.ParseJSONResponse(resp, &poll)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(poll.ExpiresAt).To(BeNil())
+			})
+
+			It("should create a poll without expiration when duration is zero", func() {
+				resp, err := testServer.CreatePollWithDuration(
+					"Should this poll expire?",
+					false,
+					[]string{"Yes", "No"},
+					0, // 0 hours (no expiration)
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var poll models.Poll
+				err = helpers.ParseJSONResponse(resp, &poll)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(poll.ExpiresAt).To(BeNil())
+			})
+		})
+
+		Context("when retrieving polls", func() {
+			It("should include expiration status for non-expired polls", func() {
+				// Create a poll that expires in 1 hour
+				poll := helpers.CreatePollWithDuration(db, 1*time.Hour)
+
+				resp, err := testServer.GetPoll(poll.ID)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var response map[string]interface{}
+				err = helpers.ParseJSONResponse(resp, &response)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response["is_expired"]).To(BeFalse())
+				
+				pollData := response["poll"].(map[string]interface{})
+				Expect(pollData["expires_at"]).NotTo(BeNil())
+			})
+
+			It("should include expiration status for expired polls", func() {
+				// Create an expired poll
+				poll := helpers.CreateExpiredPoll(db)
+
+				resp, err := testServer.GetPoll(poll.ID)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var response map[string]interface{}
+				err = helpers.ParseJSONResponse(resp, &response)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response["is_expired"]).To(BeTrue())
+			})
+
+			It("should show non-expiring polls as not expired", func() {
+				// Create a non-expiring poll
+				poll := helpers.CreateNonExpiringPoll(db)
+
+				resp, err := testServer.GetPoll(poll.ID)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var response map[string]interface{}
+				err = helpers.ParseJSONResponse(resp, &response)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response["is_expired"]).To(BeFalse())
+				
+				pollData := response["poll"].(map[string]interface{})
+				Expect(pollData["expires_at"]).To(BeNil())
+			})
+		})
+
+		Context("when voting on polls", func() {
+			It("should allow voting on non-expired polls", func() {
+				// Create a poll that expires in 1 hour
+				poll := helpers.CreatePollWithDuration(db, 1*time.Hour)
+				responseID := poll.Responses[0].ID
+
+				resp, err := testServer.Vote(poll.ID, responseID)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				// Verify vote was recorded
+				var updatedResponse models.PollResponse
+				err = db.First(&updatedResponse, responseID).Error
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedResponse.Votes).To(Equal(uint(1)))
+			})
+
+			It("should prevent voting on expired polls", func() {
+				// Create an expired poll
+				poll := helpers.CreateExpiredPoll(db)
+				responseID := poll.Responses[0].ID
+
+				resp, err := testServer.Vote(poll.ID, responseID)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusForbidden))
+
+				body, err := helpers.GetResponseBody(resp)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(body).To(ContainSubstring("expired"))
+
+				// Verify vote was not recorded
+				var unchangedResponse models.PollResponse
+				err = db.First(&unchangedResponse, responseID).Error
+				Expect(err).NotTo(HaveOccurred())
+				Expect(unchangedResponse.Votes).To(Equal(uint(0)))
+			})
+
+			It("should allow voting on polls without expiration", func() {
+				// Create a non-expiring poll
+				poll := helpers.CreateNonExpiringPoll(db)
+				responseID := poll.Responses[0].ID
+
+				resp, err := testServer.Vote(poll.ID, responseID)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				// Verify vote was recorded
+				var updatedResponse models.PollResponse
+				err = db.First(&updatedResponse, responseID).Error
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedResponse.Votes).To(Equal(uint(1)))
+			})
+		})
+	})
+
 	Describe("Complete Polling Workflow", func() {
 		It("should handle the complete polling lifecycle", func() {
 			By("Creating a new poll")
@@ -376,6 +550,46 @@ var _ = Describe("Polling API Integration Tests", func() {
 			err = helpers.ParseJSONResponse(finalGetResp, &finalResponse)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(finalResponse["has_voted"]).To(BeTrue())
+		})
+
+		It("should handle the complete lifecycle with poll duration", func() {
+			By("Creating a poll with 1 hour duration")
+			createResp, err := testServer.CreatePollWithDuration(
+				"Which framework will you use next?",
+				true, // Enable vote limiting
+				[]string{"React", "Vue", "Svelte", "Angular"},
+				1, // 1 hour duration
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createResp.StatusCode).To(Equal(http.StatusOK))
+
+			var poll models.Poll
+			err = helpers.ParseJSONResponse(createResp, &poll)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(poll.ExpiresAt).NotTo(BeNil())
+
+			By("Retrieving the poll and checking expiration status")
+			getResp, err := testServer.GetPoll(poll.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getResp.StatusCode).To(Equal(http.StatusOK))
+
+			var getResponse map[string]interface{}
+			err = helpers.ParseJSONResponse(getResp, &getResponse)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getResponse["is_expired"]).To(BeFalse())
+
+			sessionCookie := helpers.ExtractSessionCookie(getResp)
+
+			By("Voting on the non-expired poll")
+			voteResp, err := testServer.VoteWithSession(poll.ID, poll.Responses[0].ID, sessionCookie)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(voteResp.StatusCode).To(Equal(http.StatusOK))
+
+			By("Verifying the vote was recorded")
+			var updatedResponse models.PollResponse
+			err = db.First(&updatedResponse, poll.Responses[0].ID).Error
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updatedResponse.Votes).To(Equal(uint(1)))
 		})
 	})
 })

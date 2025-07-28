@@ -10,7 +10,16 @@ type Poll struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	Question  string         `gorm:"type:varchar(512);not null" json:"question"`
 	LimitVotes bool          `gorm:"default:false" json:"limit_votes"`
+	ExpiresAt *time.Time     `json:"expires_at,omitempty"`
 	Responses []PollResponse `gorm:"foreignKey:PollID" json:"responses"`
+}
+
+// IsExpired checks if the poll has expired
+func (p *Poll) IsExpired() bool {
+	if p.ExpiresAt == nil {
+		return false
+	}
+	return time.Now().After(*p.ExpiresAt)
 }
 
 type PollResponse struct {
