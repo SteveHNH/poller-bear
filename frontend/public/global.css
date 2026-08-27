@@ -1,4 +1,43 @@
-@import url('https://fonts.googleapis.com/css?family=Alfa+Slab+One');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+	/* Surfaces */
+	--bg: #0b0c10;
+	--bg-elevated: #101218;
+	--surface: #15171e;
+	--surface-hover: #1b1e27;
+	--border: rgba(255, 255, 255, 0.08);
+	--border-strong: rgba(255, 255, 255, 0.16);
+
+	/* Text */
+	--text: #eef0f4;
+	--text-dim: #9599a6;
+	--text-faint: #868a94;
+
+	/* Accent */
+	--accent: #5457e0;
+	--accent-hover: #6669ec;
+	--accent-text: #ffffff;
+	--accent-fg: #9496fa; /* accent tint for text on dark surfaces (WCAG AA) */
+	--accent-soft: rgba(110, 111, 245, 0.12);
+	--accent-soft-border: rgba(110, 111, 245, 0.35);
+
+	/* Status */
+	--danger: #f2555a;
+	--danger-soft: rgba(242, 85, 90, 0.12);
+	--success: #3ecf8e;
+
+	/* Shape */
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 14px;
+	--radius-full: 999px;
+
+	/* Elevation */
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+	--shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+	--shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
 
 html, body {
 	position: relative;
@@ -7,30 +46,36 @@ html, body {
 }
 
 body {
-	color: #333;
+	color: var(--text);
+	background: var(--bg);
 	margin: 0;
-	padding: 8px;
+	padding: 0;
 	box-sizing: border-box;
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after {
+	box-sizing: border-box;
+}
+
+h1, h2, h3 {
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	margin: 0;
 }
 
 h1 {
-  padding: 0px;
-  font-family: 'Alfa Slab One';
-  font-size: 2em;
+	font-size: 1.85em;
 }
 
 a {
-	color: rgb(0,100,200);
+	color: var(--accent-fg);
 	text-decoration: none;
 }
 
 a:hover {
-	text-decoration: underline;
-}
-
-a:visited {
-	color: rgb(0,80,160);
+	color: var(--accent-hover);
 }
 
 a.header-link {
@@ -43,37 +88,67 @@ label {
 	display: block;
 }
 
-input, button, select, textarea {
+input, select, textarea {
 	font-family: inherit;
-	font-size: inherit;
-	-webkit-padding: 0.4em 0;
-	padding: 0.4em;
-	margin: 0 0 0.5em 0;
+	font-size: 0.95rem;
+	padding: 0.65em 0.85em;
+	margin: 0;
 	box-sizing: border-box;
-	border: 1px solid #ccc;
-	border-radius: 2px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	color: var(--text);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input::placeholder, textarea::placeholder {
+	color: var(--text-faint);
+}
+
+input:focus, select:focus, textarea:focus {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 input:disabled {
-	color: #ccc;
+	color: var(--text-faint);
+	opacity: 0.6;
 }
 
 button {
-	color: #333;
-	background-color: #f4f4f4;
+	font-family: inherit;
+	font-size: 0.95rem;
+	font-weight: 600;
+	padding: 0.65em 1.1em;
+	margin: 0;
+	box-sizing: border-box;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	color: var(--text);
+	background-color: var(--surface);
+	cursor: pointer;
 	outline: none;
+	transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+button:hover:not(:disabled) {
+	background-color: var(--surface-hover);
+	border-color: var(--border-strong);
 }
 
 button:disabled {
-	color: #999;
+	color: var(--text-faint);
+	cursor: not-allowed;
+	opacity: 0.55;
 }
 
 button:not(:disabled):active {
-	background-color: #ddd;
+	transform: translateY(1px);
 }
 
-button:focus {
-	border-color: #666;
+button:focus-visible {
+	box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 ul.custom-bullet {

@@ -1,6 +1,5 @@
 <script>
 import { onMount, onDestroy } from 'svelte';
-import { Stack, Text, Progress, Card, Badge, Button, Group, ActionIcon } from '@svelteuidev/core';
 import { navigate } from "svelte-routing";
 
 export let id;
@@ -57,45 +56,24 @@ onDestroy(() => {
 
 <div class="results-container">
   {#if pollData}
-    <Card class="results-card" shadow="xl" radius="lg">
+    <div class="results-card">
       <div class="results-header">
         <div class="header-content">
           <h1 class="poll-question">{pollData.question}</h1>
           <div class="poll-stats">
-            <Badge variant="gradient" gradient={{ from: 'green', to: 'teal' }} size="lg">
-              📊 {totalVotes} total votes
-            </Badge>
-            <Badge variant="light" color="blue" size="md">
-              Live Results
-            </Badge>
+            <span class="badge badge-accent">{totalVotes} total {totalVotes === 1 ? 'vote' : 'votes'}</span>
+            <span class="badge">Live results</span>
           </div>
         </div>
-        
-        <Group class="header-actions">
-          <Button
-            variant="gradient"
-            gradient={{ from: 'teal', to: 'blue' }}
-            size="sm"
-            radius="xl"
-            on:click={sharePoll}
-          >
-            Share
-          </Button>
-          <Button
-            variant="subtle"
-            size="sm"
-            on:click={goBackToPoll}
-          >
-            ← Back to Poll
-          </Button>
-        </Group>
+
+        <div class="header-actions">
+          <button class="secondary-button" on:click={sharePoll}>Share</button>
+          <button class="secondary-button" on:click={goBackToPoll}>Back to poll</button>
+        </div>
       </div>
 
       {#if shareMessage}
-        <div class="share-notification">
-          <div class="notification-icon">✅</div>
-          <Text size="sm" weight="500" color="teal">{shareMessage}</Text>
-        </div>
+        <div class="share-notification">{shareMessage}</div>
       {/if}
 
       <div class="results-content">
@@ -103,40 +81,24 @@ onDestroy(() => {
           {#each pollData.responses.sort((a, b) => b.votes - a.votes) as response, index (response.id)}
             <div class="result-item" class:winner={index === 0 && response.votes > 0}>
               <div class="result-header">
-                <div class="result-ranking">
-                  {#if index === 0 && response.votes > 0}
-                    🏆
-                  {:else if index === 1 && response.votes > 0}
-                    🥈
-                  {:else if index === 2 && response.votes > 0}
-                    🥉
-                  {:else}
-                    #{index + 1}
-                  {/if}
-                </div>
+                <div class="result-ranking">#{index + 1}</div>
                 <div class="result-text">
-                  <Text size="lg" weight="600" class="option-text">
-                    {response.text}
-                  </Text>
+                  <p class="option-text">{response.text}</p>
                   <div class="vote-count">
-                    <Text size="sm" color="dimmed">
-                      {response.votes} {response.votes === 1 ? 'vote' : 'votes'}
-                    </Text>
-                    <Text size="md" weight="700" class="percentage">
+                    <span class="vote-count-label">{response.votes} {response.votes === 1 ? 'vote' : 'votes'}</span>
+                    <span class="percentage">
                       {totalVotes > 0 ? Math.round((response.votes / totalVotes) * 100) : 0}%
-                    </Text>
+                    </span>
                   </div>
                 </div>
               </div>
-              
+
               <div class="progress-container">
-                <div 
+                <div
                   class="progress-bar"
                   class:winner-bar={index === 0 && response.votes > 0}
                   style="width: {totalVotes > 0 ? (response.votes / totalVotes) * 100 : 0}%"
-                >
-                  <div class="progress-shimmer"></div>
-                </div>
+                ></div>
               </div>
             </div>
           {/each}
@@ -144,60 +106,41 @@ onDestroy(() => {
 
         {#if totalVotes === 0}
           <div class="no-votes">
-            <div class="no-votes-icon">🗳️</div>
-            <Text size="xl" weight="500" color="dimmed">
-              No votes yet!
-            </Text>
-            <Text size="md" color="dimmed">
-              Be the first to vote on this poll.
-            </Text>
-            <Button
-              variant="gradient"
-              gradient={{ from: 'blue', to: 'purple' }}
-              size="lg"
-              on:click={goBackToPoll}
-              class="vote-now-btn"
-            >
-              🗳️ Vote Now
-            </Button>
+            <p class="no-votes-title">No votes yet</p>
+            <p class="no-votes-description">Be the first to vote on this poll.</p>
+            <button class="primary-button" on:click={goBackToPoll}>
+              Vote now
+            </button>
           </div>
         {/if}
 
         <div class="results-footer">
-          <Text size="xs" color="dimmed" align="center">
-            Results update automatically every 5 seconds
-          </Text>
+          Results update automatically every 5 seconds
         </div>
       </div>
-    </Card>
+    </div>
   {:else}
-    <Card class="loading-card" shadow="lg" radius="lg">
+    <div class="loading-card">
       <div class="loading-content">
         <div class="loading-spinner"></div>
-        <Text size="xl" weight="500" color="dimmed">Loading poll results...</Text>
+        <p class="loading-text">Loading poll results…</p>
       </div>
-    </Card>
+    </div>
   {/if}
 </div>
 
 <style>
   .results-container {
-    max-width: 800px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 2rem 1rem;
   }
 
-  .results-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
+  .results-card, .loading-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
     overflow: hidden;
-  }
-
-  .loading-card {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-    border: none;
   }
 
   .loading-content {
@@ -205,14 +148,20 @@ onDestroy(() => {
     padding: 4rem 2rem;
   }
 
+  .loading-text {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin: 0;
+  }
+
   .loading-spinner {
-    width: 60px;
-    height: 60px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-top: 4px solid white;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top: 3px solid var(--accent);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 2rem auto;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1.25rem auto;
   }
 
   @keyframes spin {
@@ -224,29 +173,45 @@ onDestroy(() => {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 2rem 2rem 1rem 2rem;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2rem 2rem 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
     gap: 1rem;
   }
 
   .header-content {
     flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
   .poll-question {
-    margin: 0 0 1rem 0;
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.3;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.35;
   }
 
   .poll-stats {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
+  }
+
+  .badge {
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-full);
+  }
+
+  .badge-accent {
+    color: var(--accent-fg);
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-border);
   }
 
   .header-actions {
@@ -255,104 +220,87 @@ onDestroy(() => {
     flex-shrink: 0;
   }
 
+  .primary-button {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  .primary-button:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .secondary-button {
+    background: transparent;
+  }
+
   .share-notification {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin: 0 2rem 1rem 2rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    animation: slideIn 0.3s ease-out;
-  }
-
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .notification-icon {
-    font-size: 1.2rem;
+    margin: 1.25rem 2rem 0 2rem;
+    padding: 0.75rem 1rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft-border);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
   }
 
   .results-content {
-    padding: 2rem;
+    padding: 1.75rem 2rem 2rem 2rem;
   }
 
   .results-grid {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    gap: 0.9rem;
+    margin-bottom: 1.5rem;
   }
 
   .result-item {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
-    padding: 1.5rem;
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
-    animation: resultFadeIn 0.5s ease-out;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.1rem 1.25rem;
   }
 
   .result-item.winner {
-    background: rgba(255, 215, 0, 0.2);
-    border-color: rgba(255, 215, 0, 0.4);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-  }
-
-  @keyframes resultFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .result-item:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
+    border-color: var(--accent-soft-border);
+    background: var(--accent-soft);
   }
 
   .result-header {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: 0.9rem;
+    margin-bottom: 0.75rem;
   }
 
   .result-ranking {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 50px;
-    height: 50px;
-    background: rgba(255, 255, 255, 0.2);
+    width: 30px;
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 50%;
-    font-size: 1.5rem;
+    font-size: 0.75rem;
     font-weight: 700;
+    color: var(--text-dim);
     flex-shrink: 0;
   }
 
   .result-text {
     flex-grow: 1;
+    min-width: 0;
   }
 
   .option-text {
-    color: white;
-    margin-bottom: 0.25rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem 0;
   }
 
   .vote-count {
@@ -361,124 +309,94 @@ onDestroy(() => {
     align-items: center;
   }
 
+  .vote-count-label {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
   .percentage {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    color: white;
-    font-size: 0.9rem;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 700;
   }
 
   .progress-container {
     position: relative;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
+    height: 6px;
+    background: var(--border);
+    border-radius: var(--radius-full);
     overflow: hidden;
   }
 
   .progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
-    border-radius: 4px;
-    transition: width 1s ease-out;
-    position: relative;
-    overflow: hidden;
+    background: var(--accent);
+    border-radius: var(--radius-full);
+    transition: width 0.6s ease-out;
   }
 
   .progress-bar.winner-bar {
-    background: linear-gradient(90deg, #ffd700 0%, #ffed4e 100%);
-  }
-
-  .progress-shimmer {
-    position: absolute;
-    top: 0;
-    left: -100%;
-    height: 100%;
-    width: 100%;
-    background: linear-gradient(90deg, 
-      transparent, 
-      rgba(255, 255, 255, 0.4), 
-      transparent
-    );
-    animation: shimmer 2s infinite;
-  }
-
-  @keyframes shimmer {
-    0% { left: -100%; }
-    100% { left: 100%; }
+    background: var(--accent);
   }
 
   .no-votes {
     text-align: center;
-    padding: 4rem 2rem;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    margin-bottom: 2rem;
+    padding: 3rem 2rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
   }
 
-  .no-votes-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+  .no-votes-title {
+    color: var(--text);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem 0;
   }
 
-  .vote-now-btn {
-    margin-top: 1.5rem;
+  .no-votes-description {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin: 0 0 1.5rem 0;
   }
 
   .results-footer {
     text-align: center;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    padding: 0.85rem;
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
   }
 
   @media (max-width: 640px) {
-    .results-container {
-      padding: 1rem 0.5rem;
-    }
-    
     .results-header {
       flex-direction: column;
       align-items: stretch;
       gap: 1rem;
-      padding: 1.5rem 1rem 1rem 1rem;
+      padding: 1.5rem 1.25rem 1.1rem 1.25rem;
     }
-    
+
     .header-actions {
-      justify-content: center;
+      justify-content: stretch;
     }
-    
+
+    .header-actions .secondary-button {
+      flex: 1;
+    }
+
     .poll-question {
-      font-size: 1.5rem;
-      text-align: center;
+      font-size: 1.3rem;
     }
-    
+
     .results-content {
-      padding: 1rem;
+      padding: 1.25rem;
     }
-    
+
     .result-item {
       padding: 1rem;
-    }
-    
-    .result-header {
-      flex-direction: column;
-      text-align: center;
-      gap: 0.75rem;
-    }
-    
-    .result-ranking {
-      align-self: center;
-    }
-    
-    .vote-count {
-      justify-content: center;
-      gap: 1rem;
-    }
-    
-    .poll-stats {
-      justify-content: center;
     }
   }
 </style>
