@@ -15,6 +15,10 @@ import (
 	"poller-bear/internal/session"
 )
 
+const (
+  MinPollDurationHours = 1
+  MaxPollDurationHours = 8760 // 1 year
+)
 
 func Home(c echo.Context) error {
   return c.String(http.StatusOK, "hello world!")
@@ -34,9 +38,16 @@ func CreatePollHandler() echo.HandlerFunc {
     poll := req.Poll
 
     // Set expiration time if duration is provided
-    if req.DurationHours != nil && *req.DurationHours > 0 {
-      expiresAt := time.Now().Add(time.Duration(*req.DurationHours) * time.Hour)
-      poll.ExpiresAt = &expiresAt
+    if req.DurationHours != nil {
+      switch {
+      case *req.DurationHours < 0:
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Duration hours cannot be negative"})
+      case *req.DurationHours > MaxPollDurationHours:
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Duration cannot exceed 8760 hours (1 year)"})
+      case *req.DurationHours >= MinPollDurationHours:
+        expiresAt := time.Now().UTC().Add(time.Duration(*req.DurationHours) * time.Hour)
+        poll.ExpiresAt = &expiresAt
+      }
     }
 
     // Validate poll data

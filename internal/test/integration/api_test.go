@@ -388,6 +388,40 @@ var _ = Describe("Polling API Integration Tests", func() {
 
 				Expect(poll.ExpiresAt).To(BeNil())
 			})
+
+			It("should reject negative duration_hours", func() {
+				resp, err := testServer.CreatePollWithDuration(
+					"Should this poll accept negative duration?",
+					false,
+					[]string{"Yes", "No"},
+					-5,
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+
+				var errorResponse map[string]string
+				err = helpers.ParseJSONResponse(resp, &errorResponse)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(errorResponse["error"]).To(Equal("Duration hours cannot be negative"))
+			})
+
+			It("should reject duration exceeding the maximum allowed hours", func() {
+				resp, err := testServer.CreatePollWithDuration(
+					"Should this poll accept a duration over one year?",
+					false,
+					[]string{"Yes", "No"},
+					8761, // 1 hour past the 1 year (8760 hour) max
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+
+				var errorResponse map[string]string
+				err = helpers.ParseJSONResponse(resp, &errorResponse)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(errorResponse["error"]).To(Equal("Duration cannot exceed 8760 hours (1 year)"))
+			})
 		})
 
 		Context("when retrieving polls", func() {

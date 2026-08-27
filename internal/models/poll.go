@@ -19,7 +19,7 @@ func (p *Poll) IsExpired() bool {
 	if p.ExpiresAt == nil {
 		return false
 	}
-	return time.Now().After(*p.ExpiresAt)
+	return time.Now().UTC().After(*p.ExpiresAt)
 }
 
 type PollResponse struct {
