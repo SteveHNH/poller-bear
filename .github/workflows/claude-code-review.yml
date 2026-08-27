@@ -1,28 +1,28 @@
-name: Claude Code Review
+name: Claude Code Review (On-Demand)
 
 # Authenticates to the Claude API via Workload Identity Federation (WIF) by
 # exchanging the workflow's GitHub OIDC token for a short-lived Anthropic
 # access token — no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY secret needed.
 # One-time Console setup (issuer, service account, federation rule):
 # https://platform.claude.com/docs/en/manage-claude/workload-identity-federation
+#
+# This runs on-demand (comment "/review" on a PR) rather than automatically
+# on every PR open/push, to avoid burning API quota on PR spam. Comment
+# triggers run against the default branch context, so their OIDC subject is
+# "repo:<owner>/<repo>:ref:refs/heads/main" — the same shape used by
+# claude.yml's federation rule, unlike `pull_request`-triggered runs which
+# get a different subject ("repo:<owner>/<repo>:pull_request") and would
+# require a separate federation rule.
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+  issue_comment:
+    types: [created]
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/review')
 
     runs-on: ubuntu-latest
     permissions:
@@ -32,9 +32,10 @@ jobs:
       id-token: write # Required: used to fetch the GitHub OIDC token for the federation exchange
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
           fetch-depth: 1
 
       - name: Run Claude Code Review
@@ -48,10 +49,10 @@ jobs:
           anthropic_service_account_id: svac_0137NaWAVKdQy9cX6zwGY4Qp
           anthropic_workspace_id: wrkspc_01NMaEnPPnDpcS59veT9MJYk
 
-          # Prompt for automated review (no @claude mention needed)
+          # Prompt for on-demand review, triggered by commenting "/review"
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR NUMBER: ${{ github.event.issue.number }}
 
             Please review this pull request and provide feedback on:
             - Code quality and best practices
@@ -71,30 +72,16 @@ jobs:
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
 
-          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
+          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent /review requests
           # use_sticky_comment: true
 
           # Optional: Customize review based on file types
           # prompt: |
           #   REPO: ${{ github.repository }}
-          #   PR NUMBER: ${{ github.event.pull_request.number }}
+          #   PR NUMBER: ${{ github.event.issue.number }}
           #
           #   Review this PR focusing on:
           #   - For TypeScript files: Type safety and proper interface usage
           #   - For API endpoints: Security, input validation, and error handling
           #   - For React components: Performance, accessibility, and best practices
           #   - For tests: Coverage, edge cases, and test quality
-
-          # Optional: Different prompts for different authors
-          # prompt: |
-          #   REPO: ${{ github.repository }}
-          #   PR NUMBER: ${{ github.event.pull_request.number }}
-          #
-          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' &&
-          #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
-          #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-
-          # Optional: Skip review for certain conditions
-          # if: |
-          #   !contains(github.event.pull_request.title, '[skip-review]') &&
-          #   !contains(github.event.pull_request.title, '[WIP]')
