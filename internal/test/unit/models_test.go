@@ -21,6 +21,7 @@ var _ = Describe("Models Unit Tests", func() {
 
 				Expect(poll.Question).To(Equal("Test question?"))
 				Expect(poll.LimitVotes).To(BeFalse()) // Default should be false
+				Expect(poll.ExpiresAt).To(BeNil()) // Default should be nil (no expiration)
 				Expect(poll.ID).To(BeZero())
 				Expect(poll.Responses).To(BeEmpty())
 			})
@@ -32,6 +33,58 @@ var _ = Describe("Models Unit Tests", func() {
 				}
 
 				Expect(poll.LimitVotes).To(BeTrue())
+			})
+
+			It("should allow expiration time to be set", func() {
+				futureTime := time.Now().Add(24 * time.Hour)
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: &futureTime,
+				}
+
+				Expect(poll.ExpiresAt).NotTo(BeNil())
+				Expect(*poll.ExpiresAt).To(BeTemporally("~", futureTime, time.Second))
+			})
+		})
+
+		Context("when checking expiration", func() {
+			It("should not be expired when ExpiresAt is nil", func() {
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: nil,
+				}
+
+				Expect(poll.IsExpired()).To(BeFalse())
+			})
+
+			It("should not be expired when ExpiresAt is in the future", func() {
+				futureTime := time.Now().Add(1 * time.Hour)
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: &futureTime,
+				}
+
+				Expect(poll.IsExpired()).To(BeFalse())
+			})
+
+			It("should be expired when ExpiresAt is in the past", func() {
+				pastTime := time.Now().Add(-1 * time.Hour)
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: &pastTime,
+				}
+
+				Expect(poll.IsExpired()).To(BeTrue())
+			})
+
+			It("should be expired when ExpiresAt is exactly now", func() {
+				now := time.Now().Add(-1 * time.Millisecond) // Slightly in the past to ensure it's expired
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: &now,
+				}
+
+				Expect(poll.IsExpired()).To(BeTrue())
 			})
 		})
 

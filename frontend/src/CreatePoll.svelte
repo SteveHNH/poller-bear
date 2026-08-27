@@ -5,6 +5,7 @@ import { Button, TextInput, Checkbox, Text, Card, Badge, ActionIcon, Stack, Grou
     let question = "";
     let responses = ["", ""];
     let limitVotes = false;
+    let durationHours = null;
     let canSubmit = false;
     let errorMessage = "";
     let isSubmitting = false;
@@ -32,16 +33,23 @@ import { Button, TextInput, Checkbox, Text, Card, Badge, ActionIcon, Stack, Grou
 
       try {
         const validOptions = responses.filter(response => Boolean(response.trim()));
+        const requestBody = { 
+            question, 
+            limit_votes: limitVotes,
+            responses: validOptions.map(text => ({ text }))
+        };
+        
+        // Add duration_hours if specified
+        if (durationHours && durationHours > 0) {
+          requestBody.duration_hours = parseInt(durationHours);
+        }
+        
         const response = await fetch("/api/create", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ 
-                question, 
-                limit_votes: limitVotes,
-                responses: validOptions.map(text => ({ text }))
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
@@ -143,6 +151,23 @@ import { Button, TextInput, Checkbox, Text, Card, Badge, ActionIcon, Stack, Grou
               label="Limit votes to one per user"
               description="Prevents users from voting multiple times using cookies"
             />
+            
+            <div class="duration-setting">
+              <Text size="md" weight="500" style="color: white; margin-bottom: 0.5rem;">
+                ⏰ Poll Duration (Optional)
+              </Text>
+              <TextInput
+                size="md"
+                radius="md"
+                type="number"
+                min="1"
+                max="8760"
+                bind:value={durationHours}
+                placeholder="Duration in hours (e.g., 24 for 1 day)"
+                description="Leave empty for polls that never expire"
+                class="duration-input"
+              />
+            </div>
           </div>
         </div>
 
@@ -310,6 +335,13 @@ import { Button, TextInput, Checkbox, Text, Card, Badge, ActionIcon, Stack, Grou
     padding: 1.25rem;
     border-radius: 12px;
     margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .duration-setting {
+    margin-top: 0.5rem;
   }
 
   .error-notification {
@@ -370,6 +402,17 @@ import { Button, TextInput, Checkbox, Text, Card, Badge, ActionIcon, Stack, Grou
   }
 
   :global(.option-input input:focus) {
+    border-color: rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2) !important;
+  }
+
+  :global(.duration-input input) {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    color: #333 !important;
+  }
+
+  :global(.duration-input input:focus) {
     border-color: rgba(255, 255, 255, 0.6) !important;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2) !important;
   }

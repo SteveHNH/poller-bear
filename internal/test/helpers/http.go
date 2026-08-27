@@ -79,6 +79,27 @@ func (ts *TestServer) CreatePoll(question string, limitVotes bool, responses []s
 	)
 }
 
+// CreatePollWithDuration sends a POST request to create a new poll with duration
+func (ts *TestServer) CreatePollWithDuration(question string, limitVotes bool, responses []string, durationHours int) (*http.Response, error) {
+	payload := map[string]interface{}{
+		"question":       question,
+		"limit_votes":    limitVotes,
+		"responses":      convertToResponseObjects(responses),
+		"duration_hours": durationHours,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return ts.Client.Post(
+		fmt.Sprintf("%s/api/create", ts.URL()),
+		"application/json",
+		bytes.NewBuffer(jsonData),
+	)
+}
+
 // GetPoll sends a GET request to retrieve a poll by ID
 func (ts *TestServer) GetPoll(pollID uint) (*http.Response, error) {
 	return ts.Client.Get(fmt.Sprintf("%s/api/%d", ts.URL(), pollID))

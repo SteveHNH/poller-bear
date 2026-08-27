@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -14,6 +15,10 @@ import (
 	"poller-bear/internal/session"
 )
 
+const (
+  MinPollDurationHours = 1
+  MaxPollDurationHours = 8760 // 1 year
+)
 
 func Home(c echo.Context) error {
   return c.String(http.StatusOK, "hello world!")
@@ -21,10 +26,28 @@ func Home(c echo.Context) error {
 
 func CreatePollHandler() echo.HandlerFunc {
   return func(c echo.Context) error {
-    var poll models.Poll
+    var req struct {
+      models.Poll
+      DurationHours *int `json:"duration_hours,omitempty"`
+    }
 
-    if err := c.Bind(&poll); err != nil {
+    if err := c.Bind(&req); err != nil {
       return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+    }
+
+    poll := req.Poll
+
+    // Set expiration time if duration is provided
+    if req.DurationHours != nil {
+      switch {
+      case *req.DurationHours < 0:
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Duration hours cannot be negative"})
+      case *req.DurationHours > MaxPollDurationHours:
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Duration cannot exceed 8760 hours (1 year)"})
+      case *req.DurationHours >= MinPollDurationHours:
+        expiresAt := time.Now().UTC().Add(time.Duration(*req.DurationHours) * time.Hour)
+        poll.ExpiresAt = &expiresAt
+      }
     }
 
     // Validate poll data
@@ -69,10 +92,11 @@ func GetPollByIDHandler() echo.HandlerFunc {
       hasVoted = (err == nil)
     }
 
-    // Create response with vote status
+    // Create response with vote status and expiration status
     response := map[string]interface{}{
-      "poll":      poll,
-      "has_voted": hasVoted,
+      "poll":       poll,
+      "has_voted":  hasVoted,
+      "is_expired": poll.IsExpired(),
     }
 
     return c.JSON(http.StatusOK, response)
@@ -97,13 +121,18 @@ func VoteHandler() echo.HandlerFunc {
       return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid poll ID"})
     }
 
-    // Get the poll to check if vote limiting is enabled
+    // Get the poll to check if vote limiting is enabled and if poll is expired
     var poll models.Poll
     if err := db.DB.Where("id = ?", pollID).First(&poll).Error; err != nil {
       if err == gorm.ErrRecordNotFound {
         return c.JSON(http.StatusNotFound, map[string]string{"error": "Poll not found"})
       }
       return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve the poll"})
+    }
+
+    // Check if poll has expired
+    if poll.IsExpired() {
+      return c.JSON(http.StatusForbidden, map[string]string{"error": "This poll has expired and is no longer accepting votes"})
     }
 
     // Get or create session

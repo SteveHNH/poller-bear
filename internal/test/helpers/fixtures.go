@@ -36,6 +36,19 @@ func (pb *PollBuilder) WithVoteLimit(limit bool) *PollBuilder {
 	return pb
 }
 
+// WithExpiresAt sets the poll expiration time
+func (pb *PollBuilder) WithExpiresAt(expiresAt *time.Time) *PollBuilder {
+	pb.poll.ExpiresAt = expiresAt
+	return pb
+}
+
+// WithDuration sets the poll to expire after the specified duration from now
+func (pb *PollBuilder) WithDuration(duration time.Duration) *PollBuilder {
+	expiresAt := time.Now().Add(duration)
+	pb.poll.ExpiresAt = &expiresAt
+	return pb
+}
+
 // WithResponses adds poll response options
 func (pb *PollBuilder) WithResponses(responses []string) *PollBuilder {
 	pb.poll.Responses = make([]models.PollResponse, len(responses))
@@ -122,5 +135,33 @@ func CreateVoteRecord(db *gorm.DB, pollID uint, sessionID string) *models.VoteRe
 	return NewVoteRecordBuilder().
 		WithPollID(pollID).
 		WithSessionID(sessionID).
+		Create(db)
+}
+
+// CreatePollWithDuration creates a poll that expires after the specified duration
+func CreatePollWithDuration(db *gorm.DB, duration time.Duration) *models.Poll {
+	return NewPollBuilder().
+		WithQuestion("Poll with duration").
+		WithDuration(duration).
+		WithResponses([]string{"Option 1", "Option 2"}).
+		Create(db)
+}
+
+// CreateExpiredPoll creates a poll that has already expired
+func CreateExpiredPoll(db *gorm.DB) *models.Poll {
+	pastTime := time.Now().Add(-1 * time.Hour)
+	return NewPollBuilder().
+		WithQuestion("Expired poll").
+		WithExpiresAt(&pastTime).
+		WithResponses([]string{"Option 1", "Option 2"}).
+		Create(db)
+}
+
+// CreateNonExpiringPoll creates a poll that never expires
+func CreateNonExpiringPoll(db *gorm.DB) *models.Poll {
+	return NewPollBuilder().
+		WithQuestion("Poll that never expires").
+		WithExpiresAt(nil).
+		WithResponses([]string{"Option 1", "Option 2"}).
 		Create(db)
 }
