@@ -137,7 +137,7 @@ import { navigate } from "svelte-routing";
             <input type="checkbox" name="limit-votes" bind:checked={limitVotes} />
             <span class="checkbox-text">
               <span class="checkbox-title">Limit votes to one per user</span>
-              <span class="checkbox-description">Prevents users from voting multiple times using cookies</span>
+              <span class="checkbox-description">Prevents users from voting multiple times</span>
             </span>
           </label>
 
