@@ -18,16 +18,19 @@ import (
 
 // TestServer holds the test server and related components
 type TestServer struct {
-	Echo   *echo.Echo
-	Server *httptest.Server
-	Client *http.Client
-	DB     *gorm.DB
+	Echo          *echo.Echo
+	Server        *httptest.Server
+	Client        *http.Client
+	DB            *gorm.DB
+	OEmbedFetcher *FakeOEmbedFetcher
 }
 
 // NewTestServer creates a new test server with the polling API routes
 func NewTestServer(testDB *gorm.DB) *TestServer {
 	// Set the global DB connection for the endpoints
 	db.DB = testDB
+
+	fetcher := NewFakeOEmbedFetcher()
 
 	e := echo.New()
 	e.Use(middleware.Logger())
@@ -37,15 +40,17 @@ func NewTestServer(testDB *gorm.DB) *TestServer {
 	e.POST("/api/create", endpoints.CreatePollHandler())
 	e.GET("/api/:id", endpoints.GetPollByIDHandler())
 	e.POST("/api/:id/vote", endpoints.VoteHandler())
+	e.POST("/api/:id/submit", endpoints.NewSubmitVideoHandler(fetcher))
 
 	server := httptest.NewServer(e)
 	client := server.Client()
 
 	return &TestServer{
-		Echo:   e,
-		Server: server,
-		Client: client,
-		DB:     testDB,
+		Echo:          e,
+		Server:        server,
+		Client:        client,
+		DB:            testDB,
+		OEmbedFetcher: fetcher,
 	}
 }
 
@@ -88,6 +93,42 @@ func (ts *TestServer) CreatePollWithDuration(question string, limitVotes bool, r
 		"duration_hours": durationHours,
 	}
 
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return ts.Client.Post(
+		fmt.Sprintf("%s/api/create", ts.URL()),
+		"application/json",
+		bytes.NewBuffer(jsonData),
+	)
+}
+
+// CreateVideoCollabPoll sends a POST request to create a collaborative video poll
+func (ts *TestServer) CreateVideoCollabPoll(question string, submissionDurationHours, durationHours int) (*http.Response, error) {
+	payload := map[string]interface{}{
+		"question":                 question,
+		"type":                     "video_collab",
+		"submission_duration_hours": submissionDurationHours,
+		"duration_hours":           durationHours,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return ts.Client.Post(
+		fmt.Sprintf("%s/api/create", ts.URL()),
+		"application/json",
+		bytes.NewBuffer(jsonData),
+	)
+}
+
+// CreatePollRaw sends a POST request to /api/create with an arbitrary payload,
+// for exercising edge cases the typed helpers above don't cover.
+func (ts *TestServer) CreatePollRaw(payload map[string]interface{}) (*http.Response, error) {
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -146,6 +187,38 @@ func (ts *TestServer) VoteWithSession(pollID uint, responseID uint, sessionCooki
 	req.Header.Set("Content-Type", "application/json")
 	
 	// Add session cookie if provided
+	if sessionCookie != "" {
+		req.Header.Set("Cookie", fmt.Sprintf("poller_session=%s", sessionCookie))
+	}
+
+	return ts.Client.Do(req)
+}
+
+// SubmitVideo sends a POST request to submit a video to a collaborative video poll
+func (ts *TestServer) SubmitVideo(pollID uint, videoURL string) (*http.Response, error) {
+	return ts.SubmitVideoWithSession(pollID, videoURL, "")
+}
+
+// SubmitVideoWithSession sends a POST request to submit a video with a specific session cookie
+func (ts *TestServer) SubmitVideoWithSession(pollID uint, videoURL string, sessionCookie string) (*http.Response, error) {
+	payload := map[string]interface{}{
+		"video_url": videoURL,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/api/%d/submit", ts.URL(), pollID),
+		bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
 	if sessionCookie != "" {
 		req.Header.Set("Cookie", fmt.Sprintf("poller_session=%s", sessionCookie))
 	}

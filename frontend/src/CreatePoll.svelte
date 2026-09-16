@@ -7,16 +7,27 @@ import { navigate } from "svelte-routing";
     let responses = ["", ""];
     let limitVotes = false;
     let durationHours = null;
+    let pollType = "standard";
+    let submissionDurationHours = null;
     let canSubmit = false;
     let errorMessage = "";
     let isSubmitting = false;
 
-    $: canSubmit = question.trim() && responses.filter(opt => opt.trim()).length >= 2;
+    $: isCollab = pollType === "video_collab";
+
+    $: canSubmit = isCollab
+      ? Boolean(
+          question.trim() &&
+          submissionDurationHours > 0 &&
+          durationHours > 0 &&
+          Number(submissionDurationHours) < Number(durationHours)
+        )
+      : Boolean(question.trim() && responses.filter(opt => opt.trim()).length >= 2);
 
     $: if (responses[responses.length - 1] && responses.length < MAX_OPTIONS) {
       responses = [...responses, ""];
     }
-    
+
     function removeOption(index) {
       if (responses.length > 2) {
         responses = responses.filter((_, i) => i !== index);
@@ -25,7 +36,9 @@ import { navigate } from "svelte-routing";
 
     async function handleSubmit() {
       if (!canSubmit) {
-        errorMessage = "Please enter a question and at least two options.";
+        errorMessage = isCollab
+          ? "Please enter a question and valid submission/voting durations (submissions must close before voting does)."
+          : "Please enter a question and at least two options.";
         return;
       }
 
@@ -33,18 +46,25 @@ import { navigate } from "svelte-routing";
       isSubmitting = true;
 
       try {
-        const validOptions = responses.filter(response => Boolean(response.trim()));
-        const requestBody = { 
-            question, 
-            limit_votes: limitVotes,
-            responses: validOptions.map(text => ({ text }))
+        const requestBody = {
+          question,
+          type: pollType,
         };
-        
-        // Add duration_hours if specified
-        if (durationHours && durationHours > 0) {
+
+        if (isCollab) {
+          requestBody.submission_duration_hours = parseInt(submissionDurationHours);
           requestBody.duration_hours = parseInt(durationHours);
+        } else {
+          const validOptions = responses.filter(response => Boolean(response.trim()));
+          requestBody.limit_votes = limitVotes;
+          requestBody.responses = validOptions.map(text => ({ text }));
+
+          // Add duration_hours if specified
+          if (durationHours && durationHours > 0) {
+            requestBody.duration_hours = parseInt(durationHours);
+          }
         }
-        
+
         const response = await fetch("/api/create", {
             method: "POST",
             headers: {
@@ -83,6 +103,29 @@ import { navigate } from "svelte-routing";
 
     <form on:submit|preventDefault={handleSubmit} class="poll-form">
 
+      <!-- Poll Type Section -->
+      <div class="form-section">
+        <span class="section-label">Poll type</span>
+        <div class="poll-type-toggle" role="group" aria-label="Poll type">
+          <button
+            type="button"
+            class="poll-type-option"
+            class:active={pollType === "standard"}
+            on:click={() => pollType = "standard"}
+          >
+            Standard poll
+          </button>
+          <button
+            type="button"
+            class="poll-type-option"
+            class:active={pollType === "video_collab"}
+            on:click={() => pollType = "video_collab"}
+          >
+            Collaborative video poll
+          </button>
+        </div>
+      </div>
+
       <!-- Question Section -->
       <div class="form-section">
         <label class="section-label" for="question-input">Question</label>
@@ -96,68 +139,104 @@ import { navigate } from "svelte-routing";
         />
       </div>
 
-      <!-- Options Section -->
-      <div class="form-section">
-        <div class="options-header">
-          <span class="section-label">Response options</span>
-          <span class="options-count">{responses.filter(r => r.trim()).length} / {MAX_OPTIONS} options</span>
-        </div>
-
-        <div class="options-list">
-          {#each responses as _, index (index)}
-            <div class="option-row" class:is-last={index === responses.length - 1}>
-              <div class="option-number">{index + 1}</div>
+      {#if isCollab}
+        <!-- Collaborative Video Poll Settings -->
+        <div class="form-section">
+          <span class="section-label">Submission &amp; voting windows</span>
+          <div class="settings-content">
+            <div class="duration-setting">
+              <label class="sub-label" for="submission-duration-input">Submissions close in (hours)</label>
               <input
-                type="text"
-                name="response-option-{index}"
-                aria-label="Response Option Field"
-                bind:value={responses[index]}
-                placeholder={index === 0 ? "First option..." : index === 1 ? "Second option..." : `Option ${index + 1}...`}
-                class="option-input"
+                id="submission-duration-input"
+                type="number"
+                min="1"
+                max="8760"
+                bind:value={submissionDurationHours}
+                placeholder="e.g., 48 for 2 days"
+                class="duration-input"
               />
-              {#if responses.length > 2 && (index < responses.length - 1 || responses[index].trim() !== "")}
-                <button
-                  type="button"
-                  class="remove-option"
-                  on:click={() => removeOption(index)}
-                  title="Remove this option"
-                  aria-label="Remove option"
-                >
-                  &times;
-                </button>
-              {/if}
+              <span class="checkbox-description">Anyone with the link can submit a YouTube video until this closes</span>
             </div>
-          {/each}
-        </div>
-      </div>
 
-      <!-- Settings Section -->
-      <div class="form-section">
-        <span class="section-label">Poll settings</span>
-        <div class="settings-content">
-          <label class="checkbox-row">
-            <input type="checkbox" name="limit-votes" bind:checked={limitVotes} />
-            <span class="checkbox-text">
-              <span class="checkbox-title">Limit votes to one per user</span>
-              <span class="checkbox-description">Prevents users from voting multiple times</span>
-            </span>
-          </label>
-
-          <div class="duration-setting">
-            <label class="sub-label" for="duration-input">Poll duration (optional)</label>
-            <input
-              id="duration-input"
-              type="number"
-              min="1"
-              max="8760"
-              bind:value={durationHours}
-              placeholder="Duration in hours (e.g., 24 for 1 day)"
-              class="duration-input"
-            />
-            <span class="checkbox-description">Leave empty for polls that never expire</span>
+            <div class="duration-setting">
+              <label class="sub-label" for="voting-duration-input">Voting closes in (hours from now)</label>
+              <input
+                id="voting-duration-input"
+                type="number"
+                min="1"
+                max="8760"
+                bind:value={durationHours}
+                placeholder="e.g., 96 for 4 days"
+                class="duration-input"
+              />
+              <span class="checkbox-description">Must be later than the submission close time</span>
+            </div>
           </div>
         </div>
-      </div>
+      {:else}
+        <!-- Options Section -->
+        <div class="form-section">
+          <div class="options-header">
+            <span class="section-label">Response options</span>
+            <span class="options-count">{responses.filter(r => r.trim()).length} / {MAX_OPTIONS} options</span>
+          </div>
+
+          <div class="options-list">
+            {#each responses as _, index (index)}
+              <div class="option-row" class:is-last={index === responses.length - 1}>
+                <div class="option-number">{index + 1}</div>
+                <input
+                  type="text"
+                  name="response-option-{index}"
+                  aria-label="Response Option Field"
+                  bind:value={responses[index]}
+                  placeholder={index === 0 ? "First option..." : index === 1 ? "Second option..." : `Option ${index + 1}...`}
+                  class="option-input"
+                />
+                {#if responses.length > 2 && (index < responses.length - 1 || responses[index].trim() !== "")}
+                  <button
+                    type="button"
+                    class="remove-option"
+                    on:click={() => removeOption(index)}
+                    title="Remove this option"
+                    aria-label="Remove option"
+                  >
+                    &times;
+                  </button>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="form-section">
+          <span class="section-label">Poll settings</span>
+          <div class="settings-content">
+            <label class="checkbox-row">
+              <input type="checkbox" name="limit-votes" bind:checked={limitVotes} />
+              <span class="checkbox-text">
+                <span class="checkbox-title">Limit votes to one per user</span>
+                <span class="checkbox-description">Prevents users from voting multiple times</span>
+              </span>
+            </label>
+
+            <div class="duration-setting">
+              <label class="sub-label" for="duration-input">Poll duration (optional)</label>
+              <input
+                id="duration-input"
+                type="number"
+                min="1"
+                max="8760"
+                bind:value={durationHours}
+                placeholder="Duration in hours (e.g., 24 for 1 day)"
+                class="duration-input"
+              />
+              <span class="checkbox-description">Leave empty for polls that never expire</span>
+            </div>
+          </div>
+        </div>
+      {/if}
 
       {#if errorMessage}
         <div class="error-notification">{errorMessage}</div>
@@ -238,6 +317,27 @@ import { navigate } from "svelte-routing";
   .question-input {
     font-size: 1rem;
     padding: 0.85em 1em;
+  }
+
+  .poll-type-toggle {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .poll-type-option {
+    flex: 1;
+    padding: 0.75em 1em;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .poll-type-option.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-fg);
   }
 
   .options-header {

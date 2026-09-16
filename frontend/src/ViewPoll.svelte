@@ -1,6 +1,7 @@
 <script>
 import { onMount } from "svelte";
 import { navigate } from "svelte-routing";
+import VideoEmbed from "./VideoEmbed.svelte";
 
 export let id;
 
@@ -13,11 +14,20 @@ let loadingError = "";
 let isLoading = true;
 let shareMessage = "";
 
+let phase = "voting";
+let hasSubmitted = false;
+let submissionCount = 0;
+let videoUrl = "";
+let submitError = "";
+let isSubmittingVideo = false;
 
-onMount(async () => {
+$: isCollab = pollData && pollData.type === "video_collab";
+$: ownSubmission = isCollab && pollData.responses.length > 0 ? pollData.responses[0] : null;
+
+async function loadPoll() {
   try {
     const response = await fetch(`/api/${id}`);
-    
+
     if (!response.ok) {
       if (response.status === 404) {
         loadingError = "Poll not found. It may have been deleted or the link is incorrect.";
@@ -26,9 +36,9 @@ onMount(async () => {
       }
       return;
     }
-    
+
     const data = await response.json();
-    
+
     // Handle new response format
     if (data.poll) {
       pollData = data.poll;
@@ -38,17 +48,21 @@ onMount(async () => {
       pollData = data;
       hasVoted = false;
     }
-    
-    for (let i of pollData.responses) {
-      responseData = [...responseData, {label: i.text, value: i.id}]
-    }
+
+    phase = data.phase || "voting";
+    hasSubmitted = data.has_submitted || false;
+    submissionCount = data.submission_count || 0;
+
+    responseData = pollData.responses.map(r => ({ label: r.text, value: r.id }));
   } catch (error) {
     loadingError = "Network error. Please check your connection and try again.";
     console.error("Error loading poll:", error);
   } finally {
     isLoading = false;
   }
-});
+}
+
+onMount(loadPoll);
 
 async function submitVotes() {
   try {
@@ -76,6 +90,43 @@ async function submitVotes() {
   } catch (err) {
     errorMessage = "Network error occurred";
     console.error('Error:', err);
+  }
+}
+
+async function submitVideo() {
+  if (!videoUrl.trim()) {
+    submitError = "Please paste a YouTube link.";
+    return;
+  }
+
+  submitError = "";
+  isSubmittingVideo = true;
+
+  try {
+    const response = await fetch(`/api/${id}/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ video_url: videoUrl.trim() }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      videoUrl = "";
+      await loadPoll();
+    } else if (response.status === 409) {
+      hasSubmitted = true;
+      submitError = data.error || "You have already submitted a video to this poll";
+    } else {
+      submitError = data.error || "Failed to submit video";
+    }
+  } catch (err) {
+    submitError = "Network error occurred";
+    console.error('Error:', err);
+  } finally {
+    isSubmittingVideo = false;
   }
 }
 
@@ -136,7 +187,50 @@ async function sharePoll() {
         <div class="share-notification">{shareMessage}</div>
       {/if}
 
-      {#if pollData.limit_votes && hasVoted}
+      {#if isCollab && phase === "submission"}
+        <div class="submission-phase">
+          {#if hasSubmitted}
+            <p class="voted-text">Thanks for your submission! Voting opens once the submission window closes.</p>
+            {#if ownSubmission}
+              <div class="own-submission">
+                <VideoEmbed
+                  videoId={ownSubmission.video_id}
+                  title={ownSubmission.text}
+                  thumbnailUrl={ownSubmission.thumbnail_url}
+                />
+              </div>
+            {/if}
+          {:else}
+            <form on:submit|preventDefault={submitVideo} class="submit-video-form">
+              <label class="sub-label" for="video-url-input">Paste a YouTube link</label>
+              <input
+                id="video-url-input"
+                type="text"
+                bind:value={videoUrl}
+                placeholder="https://www.youtube.com/watch?v=..."
+                class="video-url-input"
+              />
+              {#if submitError}
+                <div class="error-notification">{submitError}</div>
+              {/if}
+              <button type="submit" disabled={isSubmittingVideo} class="primary-button">
+                {isSubmittingVideo ? 'Submitting…' : 'Submit video'}
+              </button>
+            </form>
+          {/if}
+
+          <p class="submission-count-text">
+            {submissionCount} {submissionCount === 1 ? 'submission' : 'submissions'} so far — no peeking until voting opens!
+          </p>
+        </div>
+      {:else if isCollab && phase === "closed"}
+        <div class="voted-state">
+          <p class="voted-text">Voting has closed for this poll.</p>
+          <button class="primary-button" on:click={goToResults}>
+            View results
+          </button>
+        </div>
+      {:else if pollData.limit_votes && hasVoted}
         <div class="voted-state">
           <p class="voted-text">Thanks for voting! Your response has been recorded.</p>
           <button class="primary-button" on:click={goToResults}>
@@ -145,7 +239,7 @@ async function sharePoll() {
         </div>
       {:else}
         <form on:submit|preventDefault={submitVotes} class="poll-form">
-          <div class="options-container">
+          <div class="options-container" class:video-options={isCollab}>
             {#each responseData as option, index (option.value)}
               <label class="poll-option" class:selected={selectedOption === option.value}>
                 <input
@@ -156,7 +250,17 @@ async function sharePoll() {
                 />
                 <div class="option-content">
                   <div class="option-indicator"></div>
-                  <span class="option-text">{option.label}</span>
+                  {#if isCollab}
+                    <div class="video-option-content">
+                      <VideoEmbed
+                        videoId={pollData.responses[index].video_id}
+                        title={option.label}
+                        thumbnailUrl={pollData.responses[index].thumbnail_url}
+                      />
+                    </div>
+                  {:else}
+                    <span class="option-text">{option.label}</span>
+                  {/if}
                 </div>
               </label>
             {/each}
@@ -313,11 +417,49 @@ async function sharePoll() {
     padding: 1.75rem 2rem 2rem 2rem;
   }
 
+  .submission-phase {
+    padding: 1.75rem 2rem 2rem 2rem;
+  }
+
+  .submit-video-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .video-url-input {
+    font-size: 0.95rem;
+    padding: 0.85em 1em;
+  }
+
+  .own-submission {
+    max-width: 360px;
+    margin-top: 1rem;
+  }
+
+  .submission-count-text {
+    margin: 1.5rem 0 0 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
   .options-container {
     margin-bottom: 1.5rem;
     gap: 0.6rem;
     display: flex;
     flex-direction: column;
+  }
+
+  .options-container.video-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+
+  .video-option-content {
+    flex: 1;
+    min-width: 0;
   }
 
   .poll-option {
