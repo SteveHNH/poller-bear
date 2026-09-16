@@ -1,6 +1,8 @@
 <script>
 import { navigate } from "svelte-routing";
 
+    const MAX_OPTIONS = 10;
+
     let question = "";
     let responses = ["", ""];
     let limitVotes = false;
@@ -11,7 +13,7 @@ import { navigate } from "svelte-routing";
 
     $: canSubmit = question.trim() && responses.filter(opt => opt.trim()).length >= 2;
 
-    $: if (responses[responses.length - 1]) {
+    $: if (responses[responses.length - 1] && responses.length < MAX_OPTIONS) {
       responses = [...responses, ""];
     }
     
@@ -98,7 +100,7 @@ import { navigate } from "svelte-routing";
       <div class="form-section">
         <div class="options-header">
           <span class="section-label">Response options</span>
-          <span class="options-count">{responses.filter(r => r.trim()).length} options</span>
+          <span class="options-count">{responses.filter(r => r.trim()).length} / {MAX_OPTIONS} options</span>
         </div>
 
         <div class="options-list">
@@ -113,7 +115,7 @@ import { navigate } from "svelte-routing";
                 placeholder={index === 0 ? "First option..." : index === 1 ? "Second option..." : `Option ${index + 1}...`}
                 class="option-input"
               />
-              {#if responses.length > 2 && index < responses.length - 1}
+              {#if responses.length > 2 && (index < responses.length - 1 || responses[index].trim() !== "")}
                 <button
                   type="button"
                   class="remove-option"

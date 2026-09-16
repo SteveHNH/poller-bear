@@ -97,6 +97,26 @@ var _ = Describe("Frontend Error Handling Integration Tests", func() {
 				
 				Expect(errorResponse["error"]).To(ContainSubstring("Poll must have at least 2 non-empty response options"))
 			})
+
+			It("should return validation error for too many options", func() {
+				resp, err := testServer.CreatePoll(
+					"Valid question?",
+					false,
+					[]string{
+						"Option 1", "Option 2", "Option 3", "Option 4", "Option 5",
+						"Option 6", "Option 7", "Option 8", "Option 9", "Option 10", "Option 11",
+					},
+				)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
+
+				var errorResponse map[string]interface{}
+				err = helpers.ParseJSONResponse(resp, &errorResponse)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(errorResponse["error"]).To(ContainSubstring("Poll cannot have more than 10 response options"))
+			})
 		})
 
 		Context("when submitting valid poll data", func() {
