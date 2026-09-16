@@ -1,7 +1,6 @@
 <script>
 import { onMount } from "svelte";
 import { navigate } from "svelte-routing";
-import { Stack, Button, RadioGroup, Text, Card, Badge, Group, ActionIcon } from "@svelteuidev/core";
 
 export let id;
 
@@ -100,82 +99,58 @@ async function sharePoll() {
 
 <div class="poll-container">
   {#if loadingError}
-    <Card class="error-card" shadow="lg" radius="lg">
+    <div class="status-card">
       <div class="card-content">
-        <div class="error-icon">⚠️</div>
-        <Text size="xl" weight="600" class="error-title">Oops! Something went wrong</Text>
-        <Text size="md" color="dimmed" class="error-description">
-          {loadingError}
-        </Text>
-        <Button variant="gradient" gradient={{ from: 'pink', to: 'red' }} size="md" on:click={() => window.location.reload()}>
-          Try Again
-        </Button>
+        <p class="error-title">Something went wrong</p>
+        <p class="error-description">{loadingError}</p>
+        <button class="primary-button" on:click={() => window.location.reload()}>
+          Try again
+        </button>
       </div>
-    </Card>
+    </div>
   {:else if isLoading}
-    <Card class="loading-card" shadow="lg" radius="lg">
+    <div class="status-card">
       <div class="card-content">
         <div class="loading-spinner"></div>
-        <Text size="xl" weight="500" color="dimmed">Loading your poll...</Text>
+        <p class="loading-text">Loading your poll…</p>
       </div>
-    </Card>
+    </div>
   {:else if pollData}
-    <Card class="main-poll-card" shadow="xl" radius="lg">
+    <div class="main-poll-card">
       <div class="poll-header">
         <div class="poll-title-section">
           <h1 class="poll-question">{pollData.question}</h1>
           {#if pollData.limit_votes}
-            <Badge variant="gradient" gradient={{ from: 'blue', to: 'purple' }} size="sm">
-              One Vote Per Person
-            </Badge>
+            <span class="badge">One vote per person</span>
           {/if}
         </div>
-        
+
         <div class="poll-actions">
-          <Button 
-            variant="gradient" 
-            gradient={{ from: 'teal', to: 'blue' }} 
-            size="sm" 
-            radius="xl"
-            on:click={sharePoll}
-            class="share-button"
-          >
+          <button class="secondary-button" on:click={sharePoll}>
             Share
-          </Button>
+          </button>
         </div>
       </div>
-      
+
       {#if shareMessage}
-        <div class="share-notification">
-          <div class="notification-icon">✅</div>
-          <Text size="sm" weight="500" color="teal">{shareMessage}</Text>
-        </div>
+        <div class="share-notification">{shareMessage}</div>
       {/if}
 
       {#if pollData.limit_votes && hasVoted}
         <div class="voted-state">
-          <div class="voted-icon">🗳️</div>
-          <Text size="lg" weight="500" color="dimmed">
-            Thanks for voting! Your response has been recorded.
-          </Text>
-          <Button 
-            variant="gradient" 
-            gradient={{ from: 'grape', to: 'pink' }}
-            size="lg"
-            radius="xl"
-            on:click={goToResults}
-          >
-            🎯 View Results
-          </Button>
+          <p class="voted-text">Thanks for voting! Your response has been recorded.</p>
+          <button class="primary-button" on:click={goToResults}>
+            View results
+          </button>
         </div>
       {:else}
         <form on:submit|preventDefault={submitVotes} class="poll-form">
           <div class="options-container">
             {#each responseData as option, index (option.value)}
               <label class="poll-option" class:selected={selectedOption === option.value}>
-                <input 
-                  type="radio" 
-                  bind:group={selectedOption} 
+                <input
+                  type="radio"
+                  bind:group={selectedOption}
                   value={option.value}
                   class="hidden-radio"
                 />
@@ -186,88 +161,80 @@ async function sharePoll() {
               </label>
             {/each}
           </div>
-          
+
           {#if errorMessage}
-            <div class="error-notification">
-              <div class="notification-icon">❌</div>
-              <Text weight="500" color="red">{errorMessage}</Text>
-            </div>
+            <div class="error-notification">{errorMessage}</div>
           {/if}
-          
-          <Group class="action-buttons">
-            <Button 
-              type="submit" 
+
+          <div class="action-buttons">
+            <button
+              type="submit"
               disabled={!selectedOption || hasVoted}
-              variant="gradient"
-              gradient={{ from: 'blue', to: 'purple' }}
-              size="lg"
-              radius="xl"
-              class="vote-button"
+              class="primary-button vote-button"
             >
-              🗳️ Cast Your Vote
-            </Button>
-            <Button 
-              type="button" 
-              variant="subtle"
-              size="lg"
-              radius="xl"
-              on:click={goToResults}
-            >
-              📊 View Results
-            </Button>
-          </Group>
-        </form> 
+              Cast your vote
+            </button>
+            <button type="button" class="secondary-button" on:click={goToResults}>
+              View results
+            </button>
+          </div>
+        </form>
       {/if}
-    </Card>
+    </div>
   {:else}
-    <Card class="error-card" shadow="lg" radius="lg">
+    <div class="status-card">
       <div class="card-content">
-        <div class="error-icon">💥</div>
-        <Text size="xl" weight="600" class="error-title">
-          Something went wrong loading this poll.
-        </Text>
+        <p class="error-title">Something went wrong loading this poll.</p>
       </div>
-    </Card>
+    </div>
   {/if}
 </div>
 
 <style>
   .poll-container {
-    max-width: 700px;
+    max-width: 640px;
     margin: 0 auto;
-    padding: 2rem 1rem;
+  }
+
+  .status-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
   }
 
   .card-content {
     text-align: center;
-    padding: 3rem 2rem;
-  }
-
-  .error-icon, .voted-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
+    padding: 3.5rem 2rem;
   }
 
   .error-title {
-    margin-bottom: 1rem;
-    background: linear-gradient(45deg, #e74c3c, #c0392b);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    margin: 0 0 0.75rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
   }
 
   .error-description {
-    margin-bottom: 2rem;
+    margin: 0 0 1.75rem 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+
+  .loading-text {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin: 0;
   }
 
   .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #3498db;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top: 3px solid var(--accent);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1.5rem auto;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1.25rem auto;
   }
 
   @keyframes spin {
@@ -276,78 +243,59 @@ async function sharePoll() {
   }
 
   .main-poll-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    background-size: 200% 200%;
-    animation: gradientShift 6s ease infinite;
-    color: white;
-    border: none;
-  }
-
-  @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
   }
 
   .poll-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 2rem 2rem 1rem 2rem;
+    padding: 2rem 2rem 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
     gap: 1rem;
   }
 
   .poll-title-section {
     flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
   .poll-question {
-    margin: 0 0 1rem 0;
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.3;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.35;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-self: flex-start;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-fg);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft-border);
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-full);
   }
 
   .poll-actions {
     flex-shrink: 0;
   }
 
-  .share-button {
-    transform: scale(1);
-    transition: transform 0.2s ease;
-  }
-
-  .share-button:hover {
-    transform: scale(1.1);
-  }
-
   .share-notification {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin: 0 2rem 1rem 2rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    animation: slideIn 0.3s ease-out;
-  }
-
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .notification-icon {
-    font-size: 1.2rem;
+    margin: 1.25rem 2rem 0 2rem;
+    padding: 0.75rem 1rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft-border);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
   }
 
   .voted-state {
@@ -355,13 +303,19 @@ async function sharePoll() {
     padding: 3rem 2rem;
   }
 
+  .voted-text {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin: 0 0 1.5rem 0;
+  }
+
   .poll-form {
-    padding: 0 2rem 2rem 2rem;
+    padding: 1.75rem 2rem 2rem 2rem;
   }
 
   .options-container {
-    margin-bottom: 2rem;
-    gap: 1rem;
+    margin-bottom: 1.5rem;
+    gap: 0.6rem;
     display: flex;
     flex-direction: column;
   }
@@ -369,12 +323,6 @@ async function sharePoll() {
   .poll-option {
     display: block;
     cursor: pointer;
-    transition: all 0.3s ease;
-    transform: translateX(0);
-  }
-
-  .poll-option:hover {
-    transform: translateX(5px);
   }
 
   .hidden-radio {
@@ -386,39 +334,35 @@ async function sharePoll() {
   .option-content {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 1.2rem 1.5rem;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 16px;
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    gap: 0.9rem;
+    padding: 0.95rem 1.1rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
   }
 
   .poll-option:hover .option-content {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border-color: var(--border-strong);
   }
 
   .poll-option.selected .option-content {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.6);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+    background: var(--accent-soft);
+    border-color: var(--accent);
   }
 
   .option-indicator {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.6);
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-strong);
     border-radius: 50%;
-    transition: all 0.3s ease;
+    transition: all 0.15s ease;
     position: relative;
+    flex-shrink: 0;
   }
 
   .poll-option.selected .option-indicator {
-    background: white;
-    border-color: white;
+    border-color: var(--accent);
   }
 
   .poll-option.selected .option-indicator::after {
@@ -429,66 +373,74 @@ async function sharePoll() {
     transform: translate(-50%, -50%);
     width: 8px;
     height: 8px;
-    background: #667eea;
+    background: var(--accent);
     border-radius: 50%;
   }
 
   .option-text {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 500;
-    color: white;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    color: var(--text);
   }
 
   .error-notification {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
-    background: rgba(231, 76, 60, 0.15);
-    border: 1px solid rgba(231, 76, 60, 0.3);
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
+    margin-bottom: 1.25rem;
+    padding: 0.85rem 1rem;
+    background: var(--danger-soft);
+    border: 1px solid rgba(242, 85, 90, 0.3);
+    border-radius: var(--radius-md);
+    color: var(--danger);
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
   .action-buttons {
     display: flex;
-    gap: 1rem;
-    justify-content: center;
+    gap: 0.75rem;
     flex-wrap: wrap;
   }
 
+  .primary-button {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  .primary-button:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .secondary-button {
+    background: transparent;
+  }
+
   .vote-button {
-    min-width: 180px;
+    flex: 1;
+    min-width: 160px;
   }
 
   @media (max-width: 640px) {
-    .poll-container {
-      padding: 1rem 0.5rem;
-    }
-    
     .poll-header {
       flex-direction: column;
       align-items: stretch;
       gap: 1rem;
+      padding: 1.5rem 1.25rem 1.1rem 1.25rem;
     }
-    
-    .poll-actions {
-      align-self: center;
-    }
-    
+
     .poll-question {
-      font-size: 1.5rem;
-      text-align: center;
+      font-size: 1.3rem;
     }
-    
+
+    .poll-form {
+      padding: 1.5rem 1.25rem 1.5rem 1.25rem;
+    }
+
     .action-buttons {
       flex-direction: column;
       align-items: stretch;
     }
-    
+
     .vote-button {
       min-width: auto;
     }
