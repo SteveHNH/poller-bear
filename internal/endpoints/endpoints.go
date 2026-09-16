@@ -18,6 +18,7 @@ import (
 const (
   MinPollDurationHours = 1
   MaxPollDurationHours = 8760 // 1 year
+  MaxPollOptions       = 10
 )
 
 func Home(c echo.Context) error {
@@ -203,6 +204,11 @@ func validatePoll(poll *models.Poll) error {
 	// Check if poll has at least 2 responses
 	if len(poll.Responses) < 2 {
 		return errors.New("Poll must have at least 2 response options")
+	}
+
+	// Check if poll has more than the maximum allowed responses
+	if len(poll.Responses) > MaxPollOptions {
+		return errors.New("Poll cannot have more than 10 response options")
 	}
 
 	// Validate each response
