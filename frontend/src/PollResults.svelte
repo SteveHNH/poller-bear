@@ -1,6 +1,7 @@
 <script>
 import { onMount, onDestroy } from 'svelte';
 import { navigate } from "svelte-routing";
+import VideoEmbed from "./VideoEmbed.svelte";
 
 export let id;
 
@@ -8,6 +9,8 @@ let pollData = null;
 let totalVotes = 0;
 let intervalId;
 let shareMessage = "";
+
+$: isCollab = pollData && pollData.type === "video_collab";
 
 function goBackToPoll() {
   navigate(`/polls/${id}`);
@@ -83,7 +86,17 @@ onDestroy(() => {
               <div class="result-header">
                 <div class="result-ranking">#{index + 1}</div>
                 <div class="result-text">
-                  <p class="option-text">{response.text}</p>
+                  {#if isCollab}
+                    <div class="result-video">
+                      <VideoEmbed
+                        videoId={response.video_id}
+                        title={response.text}
+                        thumbnailUrl={response.thumbnail_url}
+                      />
+                    </div>
+                  {:else}
+                    <p class="option-text">{response.text}</p>
+                  {/if}
                   <div class="vote-count">
                     <span class="vote-count-label">{response.votes} {response.votes === 1 ? 'vote' : 'votes'}</span>
                     <span class="percentage">
@@ -294,6 +307,11 @@ onDestroy(() => {
   .result-text {
     flex-grow: 1;
     min-width: 0;
+  }
+
+  .result-video {
+    max-width: 320px;
+    margin-bottom: 0.5rem;
   }
 
   .option-text {

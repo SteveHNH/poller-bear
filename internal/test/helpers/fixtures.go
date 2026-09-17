@@ -63,6 +63,18 @@ func (pb *PollBuilder) WithResponses(responses []string) *PollBuilder {
 	return pb
 }
 
+// WithType sets the poll type (models.PollTypeStandard or models.PollTypeVideoCollab)
+func (pb *PollBuilder) WithType(pollType string) *PollBuilder {
+	pb.poll.Type = pollType
+	return pb
+}
+
+// WithSubmissionCloseAt sets the submission-phase close time for collaborative video polls
+func (pb *PollBuilder) WithSubmissionCloseAt(submissionCloseAt *time.Time) *PollBuilder {
+	pb.poll.SubmissionCloseAt = submissionCloseAt
+	return pb
+}
+
 // Build creates the poll instance
 func (pb *PollBuilder) Build() *models.Poll {
 	return pb.poll
@@ -164,4 +176,33 @@ func CreateNonExpiringPoll(db *gorm.DB) *models.Poll {
 		WithExpiresAt(nil).
 		WithResponses([]string{"Option 1", "Option 2"}).
 		Create(db)
+}
+
+// CreateVideoCollabPoll creates a collaborative video poll whose submission
+// phase closes after submissionWindow and whose voting phase closes
+// submissionWindow+votingWindow from now.
+func CreateVideoCollabPoll(db *gorm.DB, submissionWindow, votingWindow time.Duration) *models.Poll {
+	submissionCloseAt := time.Now().UTC().Add(submissionWindow)
+	votingCloseAt := time.Now().UTC().Add(submissionWindow + votingWindow)
+	return NewPollBuilder().
+		WithQuestion("What should we listen to?").
+		WithType(models.PollTypeVideoCollab).
+		WithSubmissionCloseAt(&submissionCloseAt).
+		WithExpiresAt(&votingCloseAt).
+		Create(db)
+}
+
+// AddVideoSubmission creates a video submission (PollResponse) for a
+// collaborative video poll, as if it had been submitted via SubmitVideoHandler.
+func AddVideoSubmission(db *gorm.DB, pollID uint, videoURL, videoID, thumbnailURL, title, sessionID string) *models.PollResponse {
+	response := &models.PollResponse{
+		Text:               title,
+		PollID:             pollID,
+		VideoURL:           videoURL,
+		VideoID:            videoID,
+		ThumbnailURL:       thumbnailURL,
+		SubmitterSessionID: sessionID,
+	}
+	db.Create(response)
+	return response
 }

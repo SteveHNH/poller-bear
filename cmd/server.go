@@ -1,21 +1,26 @@
 package main
 
 import (
+	"time"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
 	"poller-bear/internal/config"
 	"poller-bear/internal/db"
 	"poller-bear/internal/endpoints"
+	"poller-bear/internal/youtube"
 )
 
 func main() {
   cfg := config.GetConfig()
-  db.InitializeDatabaseConnection(cfg) 
+  db.InitializeDatabaseConnection(cfg)
 
   if err := db.Migrate(); err != nil {
     panic("Failed to migrate database: " + err.Error())
   }
+
+  oEmbedFetcher := youtube.NewHTTPOEmbedFetcher(time.Duration(cfg.OEmbedTimeoutMS) * time.Millisecond)
 
   e := echo.New()
   e.Use(middleware.Logger())
@@ -24,6 +29,7 @@ func main() {
   e.POST("/api/create", endpoints.CreatePollHandler())
   e.GET("/api/:id", endpoints.GetPollByIDHandler())
   e.POST("/api/:id/vote", endpoints.VoteHandler())
+  e.POST("/api/:id/submit", endpoints.NewSubmitVideoHandler(oEmbedFetcher))
   e.GET("/polls/*", func(c echo.Context) error {
     return c.File("frontend/public/index.html")
   })

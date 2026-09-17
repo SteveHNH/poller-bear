@@ -13,12 +13,14 @@ import (
 	"poller-bear/internal/db"
 	"poller-bear/internal/models"
 	"poller-bear/internal/session"
+	"poller-bear/internal/youtube"
 )
 
 const (
   MinPollDurationHours = 1
   MaxPollDurationHours = 8760 // 1 year
   MaxPollOptions       = 10
+  MaxVideoTitleLength  = 256
 )
 
 func Home(c echo.Context) error {
@@ -29,7 +31,8 @@ func CreatePollHandler() echo.HandlerFunc {
   return func(c echo.Context) error {
     var req struct {
       models.Poll
-      DurationHours *int `json:"duration_hours,omitempty"`
+      DurationHours           *int `json:"duration_hours,omitempty"`
+      SubmissionDurationHours *int `json:"submission_duration_hours,omitempty"`
     }
 
     if err := c.Bind(&req); err != nil {
@@ -37,6 +40,10 @@ func CreatePollHandler() echo.HandlerFunc {
     }
 
     poll := req.Poll
+
+    if strings.TrimSpace(poll.Type) == "" {
+      poll.Type = models.PollTypeStandard
+    }
 
     // Set expiration time if duration is provided
     if req.DurationHours != nil {
@@ -49,6 +56,20 @@ func CreatePollHandler() echo.HandlerFunc {
         expiresAt := time.Now().UTC().Add(time.Duration(*req.DurationHours) * time.Hour)
         poll.ExpiresAt = &expiresAt
       }
+    }
+
+    if poll.Type == models.PollTypeVideoCollab {
+      if req.SubmissionDurationHours == nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Submission duration hours is required for collaborative video polls"})
+      }
+      switch {
+      case *req.SubmissionDurationHours < MinPollDurationHours:
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Submission duration must be at least 1 hour"})
+      case *req.SubmissionDurationHours > MaxPollDurationHours:
+        return c.JSON(http.StatusBadRequest, map[string]string{"error": "Submission duration cannot exceed 8760 hours (1 year)"})
+      }
+      submissionCloseAt := time.Now().UTC().Add(time.Duration(*req.SubmissionDurationHours) * time.Hour)
+      poll.SubmissionCloseAt = &submissionCloseAt
     }
 
     // Validate poll data
@@ -93,11 +114,38 @@ func GetPollByIDHandler() echo.HandlerFunc {
       hasVoted = (err == nil)
     }
 
-    // Create response with vote status and expiration status
+    phase := poll.Phase()
+
     response := map[string]interface{}{
       "poll":       poll,
       "has_voted":  hasVoted,
       "is_expired": poll.IsExpired(),
+      "phase":      phase,
+    }
+
+    if poll.Type == models.PollTypeVideoCollab {
+      hasSubmitted := false
+      var ownSubmission *models.PollResponse
+      for i := range poll.Responses {
+        if poll.Responses[i].SubmitterSessionID == sessionID {
+          hasSubmitted = true
+          ownSubmission = &poll.Responses[i]
+          break
+        }
+      }
+
+      response["has_submitted"] = hasSubmitted
+      response["submission_count"] = len(poll.Responses)
+
+      // Submissions are hidden from other participants until voting opens.
+      if phase == models.PhaseSubmission {
+        if ownSubmission != nil {
+          poll.Responses = []models.PollResponse{*ownSubmission}
+        } else {
+          poll.Responses = []models.PollResponse{}
+        }
+        response["poll"] = poll
+      }
     }
 
     return c.JSON(http.StatusOK, response)
@@ -131,8 +179,11 @@ func VoteHandler() echo.HandlerFunc {
       return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve the poll"})
     }
 
-    // Check if poll has expired
-    if poll.IsExpired() {
+    // Check the poll's current phase
+    switch poll.Phase() {
+    case models.PhaseSubmission:
+      return c.JSON(http.StatusForbidden, map[string]string{"error": "Voting hasn't started yet — the submission window is still open"})
+    case models.PhaseClosed:
       return c.JSON(http.StatusForbidden, map[string]string{"error": "This poll has expired and is no longer accepting votes"})
     }
 
@@ -201,6 +252,10 @@ func validatePoll(poll *models.Poll) error {
 		return errors.New("Poll question cannot be empty")
 	}
 
+	if poll.Type == models.PollTypeVideoCollab {
+		return validateVideoCollabPoll(poll)
+	}
+
 	// Check if poll has at least 2 responses
 	if len(poll.Responses) < 2 {
 		return errors.New("Poll must have at least 2 response options")
@@ -224,4 +279,119 @@ func validatePoll(poll *models.Poll) error {
 	}
 
 	return nil
+}
+
+// validateVideoCollabPoll validates a collaborative video poll before saving.
+// Unlike standard polls, responses aren't supplied at creation time — they're
+// added later via SubmitVideoHandler during the submission phase.
+func validateVideoCollabPoll(poll *models.Poll) error {
+	if len(poll.Responses) > 0 {
+		return errors.New("Collaborative video polls cannot have predefined responses")
+	}
+
+	if poll.SubmissionCloseAt == nil {
+		return errors.New("Submission close time is required for collaborative video polls")
+	}
+
+	if poll.ExpiresAt == nil {
+		return errors.New("Voting close time is required for collaborative video polls")
+	}
+
+	if !poll.SubmissionCloseAt.Before(*poll.ExpiresAt) {
+		return errors.New("Submission window must close before voting closes")
+	}
+
+	return nil
+}
+
+// NewSubmitVideoHandler accepts a YouTube video submission for a collaborative
+// video poll during its submission phase. The fetcher is injected so tests can
+// supply a fake instead of making a real network call.
+func NewSubmitVideoHandler(fetcher youtube.OEmbedFetcher) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		pollID := c.Param("id")
+
+		var poll models.Poll
+		if err := db.DB.Where("id = ?", pollID).First(&poll).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return c.JSON(http.StatusNotFound, map[string]string{"error": "Poll not found"})
+			}
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve the poll"})
+		}
+
+		if poll.Type != models.PollTypeVideoCollab {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "This poll does not accept video submissions"})
+		}
+
+		if poll.Phase() != models.PhaseSubmission {
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "Submissions are closed for this poll"})
+		}
+
+		sessionID, err := session.GetOrCreateSession(c)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Session error"})
+		}
+
+		var existingSubmission models.PollResponse
+		err = db.DB.Where("poll_id = ? AND submitter_session_id = ?", pollID, sessionID).First(&existingSubmission).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Error checking submission status"})
+		}
+		if err == nil {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "You have already submitted a video to this poll"})
+		}
+
+		var req struct {
+			VideoURL string `json:"video_url"`
+		}
+		if err := c.Bind(&req); err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+		}
+
+		videoURL := strings.TrimSpace(req.VideoURL)
+		if videoURL == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Video URL cannot be empty"})
+		}
+
+		videoID, err := youtube.ExtractVideoID(videoURL)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Unsupported YouTube URL format"})
+		}
+
+		metadata, err := fetcher.Fetch(videoID)
+		if err != nil {
+			if err == youtube.ErrOEmbedUnavailable {
+				return c.JSON(http.StatusUnprocessableEntity, map[string]string{"error": "This video is unavailable (it may be private or deleted)"})
+			}
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch video metadata"})
+		}
+
+		title := strings.TrimSpace(metadata.Title)
+		if title == "" {
+			title = videoID
+		}
+		if len(title) > MaxVideoTitleLength {
+			title = title[:MaxVideoTitleLength]
+		}
+
+		pollIDUint, err := strconv.ParseUint(pollID, 10, 32)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid poll ID"})
+		}
+
+		response := models.PollResponse{
+			Text:               title,
+			PollID:             uint(pollIDUint),
+			VideoURL:           videoURL,
+			VideoID:            videoID,
+			ThumbnailURL:       metadata.ThumbnailURL,
+			SubmitterSessionID: sessionID,
+		}
+
+		if err := db.DB.Create(&response).Error; err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to save the submission"})
+		}
+
+		return c.JSON(http.StatusOK, response)
+	}
 }

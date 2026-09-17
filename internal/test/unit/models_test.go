@@ -88,6 +88,86 @@ var _ = Describe("Models Unit Tests", func() {
 			})
 		})
 
+		Context("when checking Phase", func() {
+			It("should be voting for a standard poll that has not expired", func() {
+				futureTime := time.Now().Add(1 * time.Hour)
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: &futureTime,
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseVoting))
+			})
+
+			It("should be closed for a standard poll that has expired", func() {
+				pastTime := time.Now().Add(-1 * time.Hour)
+				poll := &models.Poll{
+					Question:  "Test question?",
+					ExpiresAt: &pastTime,
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseClosed))
+			})
+
+			It("should be voting for a standard poll with no expiration", func() {
+				poll := &models.Poll{
+					Question: "Test question?",
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseVoting))
+			})
+
+			It("should be submission for a collab poll before the submission close time", func() {
+				submissionCloseAt := time.Now().Add(1 * time.Hour)
+				votingCloseAt := time.Now().Add(2 * time.Hour)
+				poll := &models.Poll{
+					Question:          "What should we listen to?",
+					Type:              models.PollTypeVideoCollab,
+					SubmissionCloseAt: &submissionCloseAt,
+					ExpiresAt:         &votingCloseAt,
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseSubmission))
+			})
+
+			It("should be voting for a collab poll after submission close but before voting close", func() {
+				submissionCloseAt := time.Now().Add(-1 * time.Hour)
+				votingCloseAt := time.Now().Add(1 * time.Hour)
+				poll := &models.Poll{
+					Question:          "What should we listen to?",
+					Type:              models.PollTypeVideoCollab,
+					SubmissionCloseAt: &submissionCloseAt,
+					ExpiresAt:         &votingCloseAt,
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseVoting))
+			})
+
+			It("should be closed for a collab poll after voting close", func() {
+				submissionCloseAt := time.Now().Add(-2 * time.Hour)
+				votingCloseAt := time.Now().Add(-1 * time.Hour)
+				poll := &models.Poll{
+					Question:          "What should we listen to?",
+					Type:              models.PollTypeVideoCollab,
+					SubmissionCloseAt: &submissionCloseAt,
+					ExpiresAt:         &votingCloseAt,
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseClosed))
+			})
+
+			It("should fall back to voting/closed for a collab poll with a nil SubmissionCloseAt", func() {
+				futureTime := time.Now().Add(1 * time.Hour)
+				poll := &models.Poll{
+					Question:  "What should we listen to?",
+					Type:      models.PollTypeVideoCollab,
+					ExpiresAt: &futureTime,
+				}
+
+				Expect(poll.Phase()).To(Equal(models.PhaseVoting))
+			})
+		})
+
 		Context("when creating with responses", func() {
 			It("should properly associate responses", func() {
 				poll := &models.Poll{

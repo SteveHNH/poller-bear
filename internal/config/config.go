@@ -14,15 +14,17 @@ const (
   DATABASE_USER = "Database_User"
   DATABASE_PASS = "Database_Pass"
   DATABASE_NAME = "Database_Name"
+  OEMBED_TIMEOUT_MS = "Oembed_Timeout_Ms"
 )
 
 type Config struct {
   DatabaseImpl string
   DatabaseHost string
-  DatabasePort int 
+  DatabasePort int
   DatabaseUser string
   DatabasePass string
   DatabaseName string
+  OEmbedTimeoutMS int
 }
 
 func (c Config) String() string {
@@ -33,6 +35,7 @@ func (c Config) String() string {
   fmt.Fprintf(&b, "%s: %s\n", DATABASE_USER, c.DatabaseUser)
   fmt.Fprintf(&b, "%s: %s\n", DATABASE_PASS, c.DatabasePass)
   fmt.Fprintf(&b, "%s: %s\n", DATABASE_NAME, c.DatabaseName)
+  fmt.Fprintf(&b, "%s: %d\n", OEMBED_TIMEOUT_MS, c.OEmbedTimeoutMS)
   return b.String()
 }
 
@@ -45,6 +48,7 @@ func GetConfig() *Config {
   options.SetDefault(DATABASE_USER, "poller")
   options.SetDefault(DATABASE_PASS, "poller")
   options.SetDefault(DATABASE_NAME, "poller_bear")
+  options.SetDefault(OEMBED_TIMEOUT_MS, 5000)
   options.AutomaticEnv()
 
   config := &Config{
@@ -54,6 +58,7 @@ func GetConfig() *Config {
     DatabaseUser: options.GetString(DATABASE_USER),
     DatabasePass: options.GetString(DATABASE_PASS),
     DatabaseName: options.GetString(DATABASE_NAME),
+    OEmbedTimeoutMS: options.GetInt(OEMBED_TIMEOUT_MS),
   }
 
   return config
