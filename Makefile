@@ -1,4 +1,4 @@
-.PHONY: help install build dev server clean frontend-dev frontend-build frontend-start backend-build backend-run deps
+.PHONY: help install build dev clean frontend-dev frontend-build frontend-start rules-test firebase-emulators test deploy
 
 # Default target
 help: ## Show this help message
@@ -6,56 +6,47 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Dependencies
-install: deps ## Install all dependencies (Go modules + npm packages)
+install: deps ## Install frontend dependencies
 
-deps: ## Install Go modules and npm dependencies
-	go mod tidy
+deps: ## Install npm dependencies
 	cd frontend && npm install
 
 # Build targets
-build: backend-build frontend-build ## Build both backend and frontend
-
-backend-build: ## Build the Go backend binary
-	go build -o bin/poller-bear cmd/server.go
+build: frontend-build ## Build the Firebase Hosting site
 
 frontend-build: ## Build the Svelte frontend for production
 	cd frontend && npm run build
 
 # Development targets
-dev: ## Start both backend and frontend in development mode (requires tmux or run in separate terminals)
-	@echo "Starting development servers..."
-	@echo "Backend will run on :8080, frontend dev server will proxy to it"
-	@echo "Run 'make backend-run' and 'make frontend-dev' in separate terminals"
-
-backend-run: ## Run the Go backend server
-	go run cmd/server.go
+dev: frontend-dev ## Start the frontend dev server
 
 frontend-dev: ## Start the Svelte frontend development server with live reload
 	cd frontend && npm run dev
 
 # Production targets
-server: build ## Build and start the production server
-	./bin/poller-bear
-
 frontend-start: frontend-build ## Start the frontend production server
 	cd frontend && npm run start
 
 # Utility targets
 clean: ## Clean build artifacts
-	rm -rf bin/
 	rm -rf frontend/public/build/
 	rm -rf frontend/node_modules/.cache/
 
 # Database (assumes PostgreSQL is running)
 db-migrate: ## Run database migrations (requires running backend once)
-	@echo "Database migrations run automatically when starting the backend"
-	@echo "The new features include:"
-	@echo "  - LimitVotes field in Poll table"
-	@echo "  - VoteRecord table with SessionID for tracking votes"
-	@echo "Ensure PostgreSQL is running and configured properly"
+	@echo "Database migrations are legacy-only; see README.md for Firestore migration."
+
+rules-test: ## Run Firestore Security Rules tests in emulators
+	cd frontend && npm run test:rules
+
+firebase-emulators: ## Start Firebase emulators for local development
+	npx firebase emulators:start --only auth,firestore,hosting
+
+deploy: build ## Deploy Hosting and Firestore Rules to the selected Firebase project
+	npx firebase deploy --only hosting,firestore
 
 # Testing targets
-test: test-unit test-integration ## Run all tests (unit + integration)
+test: rules-test ## Run Firebase Rules tests
 
 test-all-fast: ## Run all tests without database setup (assumes test DB is running)
 	@echo "Running all tests..."

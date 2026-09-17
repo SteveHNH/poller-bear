@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function poll(pollId) { return get(/databases/$(database)/documents/polls/$(pollId)); }
+    function pollAfter(pollId) { return getAfter(/databases/$(database)/documents/polls/$(pollId)); }
+    function vote(pollId) { return /databases/$(database)/documents/polls/$(pollId)/votes/$(request.auth.uid); }
+    function validText(value, max) { return value is string && value.size() > 0 && value.size() <= max; }
+    function validClose(value) { return value == null || value is timestamp; }
+    function votingOpen(pollId) {
+      return poll(pollId).data.votingClosesAt == null || request.time < poll(pollId).data.votingClosesAt;
+    }
+    function submissionOpen(pollId) {
+      return poll(pollId).data.type == 'video_collab' && request.time < poll(pollId).data.submissionClosesAt;
+    }
+    function canVote(pollId) {
+      return votingOpen(pollId) && (poll(pollId).data.type == 'standard' || request.time >= poll(pollId).data.submissionClosesAt);
+    }
+    function validPollCreate() {
+      return request.resource.data.keys().hasAll(['question', 'type', 'createdAt', 'createdBy', 'limitVotes', 'submissionClosesAt', 'votingClosesAt'])
+        && request.resource.data.keys().hasOnly(['question', 'type', 'createdAt', 'createdBy', 'limitVotes', 'submissionClosesAt', 'votingClosesAt'])
+        && validText(request.resource.data.question, 512)
+        && request.resource.data.type in ['standard', 'video_collab']
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.limitVotes is bool
+        && validClose(request.resource.data.submissionClosesAt)
+        && validClose(request.resource.data.votingClosesAt)
+        && (request.resource.data.votingClosesAt == null || (request.resource.data.votingClosesAt > request.time && request.resource.data.votingClosesAt <= request.time + duration.value(8760, 'h')))
+        && (request.resource.data.type == 'standard'
+          ? request.resource.data.submissionClosesAt == null
+          : request.resource.data.limitVotes == true && request.resource.data.submissionClosesAt > request.time && request.resource.data.submissionClosesAt < request.resource.data.votingClosesAt);
+    }
+    function expectedVote(pollId, choiceCollection, choiceId) {
+      return existsAfter(vote(pollId))
+        && getAfter(vote(pollId)).data.choiceId == choiceId
+        && getAfter(vote(pollId)).data.choiceCollection == choiceCollection;
+    }
+    function voteIncrement(pollId, choiceCollection, choiceId) {
+      return canVote(pollId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])
+        && request.resource.data.votes == resource.data.votes + 1
+        && expectedVote(pollId, choiceCollection, choiceId);
+    }
+    function targetWasIncremented(pollId, choiceCollection, choiceId) {
+      return choiceCollection == 'options'
+        ? getAfter(/databases/$(database)/documents/polls/$(pollId)/options/$(choiceId)).data.votes == get(/databases/$(database)/documents/polls/$(pollId)/options/$(choiceId)).data.votes + 1
+        : getAfter(/databases/$(database)/documents/polls/$(pollId)/submissions/$(choiceId)).data.votes == get(/databases/$(database)/documents/polls/$(pollId)/submissions/$(choiceId)).data.votes + 1;
+    }
+
+    match /polls/{pollId} {
+      allow create: if signedIn() && validPollCreate();
+      allow get: if signedIn();
+      allow list, update, delete: if false;
+
+      match /options/{optionId} {
+        allow get, list: if signedIn();
+        // The UI creates 2–10 options in the same batch as the poll. Rules can validate
+        // each option but cannot count sibling documents; see README for this limitation.
+        allow create: if signedIn() && pollAfter(pollId).data.type == 'standard' && pollAfter(pollId).data.createdAt == request.time
+          && request.resource.data.keys().hasOnly(['text', 'votes'])
+          && validText(request.resource.data.text, 256) && request.resource.data.votes == 0;
+        allow update: if signedIn() && voteIncrement(pollId, 'options', optionId);
+        allow delete: if false;
+      }
+
+      match /submissions/{uid} {
+        allow get: if signedIn() && (uid == request.auth.uid || request.time >= poll(pollId).data.submissionClosesAt);
+        allow list: if signedIn() && request.time >= poll(pollId).data.submissionClosesAt;
+        allow create: if signedIn() && uid == request.auth.uid && submissionOpen(pollId)
+          && request.resource.data.keys().hasAll(['videoId', 'title', 'votes', 'submittedAt'])
+          && request.resource.data.keys().hasOnly(['videoId', 'title', 'votes', 'submittedAt'])
+          && request.resource.data.videoId is string && request.resource.data.videoId.matches('^[A-Za-z0-9_-]{11}$')
+          && validText(request.resource.data.title, 256) && request.resource.data.votes == 0
+          && request.resource.data.submittedAt == request.time;
+        allow update: if signedIn() && voteIncrement(pollId, 'submissions', uid);
+        allow delete: if false;
+      }
+
+      match /votes/{uid} {
+        allow get: if signedIn() && uid == request.auth.uid;
+        allow list, update, delete: if false;
+        allow create: if signedIn() && uid == request.auth.uid && canVote(pollId)
+          && request.resource.data.keys().hasAll(['choiceId', 'choiceCollection', 'votedAt'])
+          && request.resource.data.keys().hasOnly(['choiceId', 'choiceCollection', 'votedAt'])
+          && request.resource.data.choiceId is string
+          && request.resource.data.choiceCollection in ['options', 'submissions']
+          && request.resource.data.votedAt == request.time
+          && targetWasIncremented(pollId, request.resource.data.choiceCollection, request.resource.data.choiceId);
+      }
+    }
+  }
+}
