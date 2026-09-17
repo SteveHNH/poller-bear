@@ -14,7 +14,7 @@ async function seed({ id = 'standard', type = 'standard', submissionClosesAt = n
   await environment.withSecurityRulesDisabled(async (context) => {
     const database = context.firestore();
     await setDoc(pollRef(database, id), {
-      question: 'Pick one', type, createdAt: Timestamp.now(), createdBy: 'owner', limitVotes: type === 'video_collab', submissionClosesAt, votingClosesAt,
+      question: 'Pick one', type, createdAt: Timestamp.now(), createdBy: 'owner', limitVotes: type === 'video_collab', submissionCount: 0, submissionClosesAt, votingClosesAt,
     });
     if (type === 'standard') {
       await setDoc(doc(database, 'polls', id, 'options', 'one'), { text: 'One', votes: 0 });
@@ -37,7 +37,7 @@ describe('Firestore rules', () => {
     const database = db('creator');
     const poll = pollRef(database, 'new-poll');
     const batch = writeBatch(database);
-    batch.set(poll, { question: 'Best bear?', type: 'standard', createdAt: serverTimestamp(), createdBy: 'creator', limitVotes: false, submissionClosesAt: null, votingClosesAt: null });
+    batch.set(poll, { question: 'Best bear?', type: 'standard', createdAt: serverTimestamp(), createdBy: 'creator', limitVotes: false, submissionCount: 0, submissionClosesAt: null, votingClosesAt: null });
     batch.set(doc(poll, 'options', 'a'), { text: 'Black bear', votes: 0 });
     batch.set(doc(poll, 'options', 'b'), { text: 'Polar bear', votes: 0 });
     await assertSucceeds(batch.commit());
@@ -55,6 +55,18 @@ describe('Firestore rules', () => {
     await seed({ id: 'open', type: 'video_collab', submissionClosesAt: past() });
     await environment.withSecurityRulesDisabled(async (context) => setDoc(doc(context.firestore(), 'polls', 'open', 'submissions', 'author'), { videoId: 'dQw4w9WgXcQ', title: 'Video', votes: 0, submittedAt: Timestamp.now() }));
     await assertSucceeds(getDocs(collection(db('visitor'), 'polls', 'open', 'submissions')));
+  });
+
+  it('updates only the aggregate count with a new private submission', async () => {
+    await seed({ id: 'counted', type: 'video_collab', submissionClosesAt: future() });
+    const database = db('author');
+    const batch = writeBatch(database);
+    batch.set(doc(database, 'polls', 'counted', 'submissions', 'author'), {
+      videoId: 'dQw4w9WgXcQ', title: 'Video', votes: 0, submittedAt: serverTimestamp(),
+    });
+    batch.update(pollRef(database, 'counted'), { submissionCount: increment(1) });
+    await assertSucceeds(batch.commit());
+    await assertFails(updateDoc(pollRef(database, 'counted'), { submissionCount: 2 }));
   });
 
   it('permits one atomic vote but rejects a second vote by the same UID', async () => {

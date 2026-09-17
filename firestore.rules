@@ -17,13 +17,14 @@ service cloud.firestore {
       return votingOpen(pollId) && (poll(pollId).data.type == 'standard' || request.time >= poll(pollId).data.submissionClosesAt);
     }
     function validPollCreate() {
-      return request.resource.data.keys().hasAll(['question', 'type', 'createdAt', 'createdBy', 'limitVotes', 'submissionClosesAt', 'votingClosesAt'])
-        && request.resource.data.keys().hasOnly(['question', 'type', 'createdAt', 'createdBy', 'limitVotes', 'submissionClosesAt', 'votingClosesAt'])
+      return request.resource.data.keys().hasAll(['question', 'type', 'createdAt', 'createdBy', 'limitVotes', 'submissionCount', 'submissionClosesAt', 'votingClosesAt'])
+        && request.resource.data.keys().hasOnly(['question', 'type', 'createdAt', 'createdBy', 'limitVotes', 'submissionCount', 'submissionClosesAt', 'votingClosesAt'])
         && validText(request.resource.data.question, 512)
         && request.resource.data.type in ['standard', 'video_collab']
         && request.resource.data.createdAt == request.time
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.limitVotes is bool
+        && request.resource.data.submissionCount == 0
         && validClose(request.resource.data.submissionClosesAt)
         && validClose(request.resource.data.votingClosesAt)
         && (request.resource.data.votingClosesAt == null || (request.resource.data.votingClosesAt > request.time && request.resource.data.votingClosesAt <= request.time + duration.value(8760, 'h')))
@@ -47,11 +48,21 @@ service cloud.firestore {
         ? getAfter(/databases/$(database)/documents/polls/$(pollId)/options/$(choiceId)).data.votes == get(/databases/$(database)/documents/polls/$(pollId)/options/$(choiceId)).data.votes + 1
         : getAfter(/databases/$(database)/documents/polls/$(pollId)/submissions/$(choiceId)).data.votes == get(/databases/$(database)/documents/polls/$(pollId)/submissions/$(choiceId)).data.votes + 1;
     }
+    function incrementsSubmissionCount(pollId) {
+      return poll(pollId).data.type == 'video_collab' && submissionOpen(pollId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissionCount'])
+        && (resource.data.keys().hasAll(['submissionCount'])
+          ? request.resource.data.submissionCount == resource.data.submissionCount + 1
+          : request.resource.data.submissionCount == 1)
+        && !exists(/databases/$(database)/documents/polls/$(pollId)/submissions/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/polls/$(pollId)/submissions/$(request.auth.uid));
+    }
 
     match /polls/{pollId} {
       allow create: if signedIn() && validPollCreate();
       allow get: if signedIn();
-      allow list, update, delete: if false;
+      allow list, delete: if false;
+      allow update: if signedIn() && incrementsSubmissionCount(pollId);
 
       match /options/{optionId} {
         allow get, list: if signedIn();
@@ -72,7 +83,9 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['videoId', 'title', 'votes', 'submittedAt'])
           && request.resource.data.videoId is string && request.resource.data.videoId.matches('^[A-Za-z0-9_-]{11}$')
           && validText(request.resource.data.title, 256) && request.resource.data.votes == 0
-          && request.resource.data.submittedAt == request.time;
+          && request.resource.data.submittedAt == request.time
+          && getAfter(/databases/$(database)/documents/polls/$(pollId)).data.submissionCount
+            == (poll(pollId).data.keys().hasAll(['submissionCount']) ? poll(pollId).data.submissionCount + 1 : 1);
         allow update: if signedIn() && voteIncrement(pollId, 'submissions', uid);
         allow delete: if false;
       }

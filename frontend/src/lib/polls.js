@@ -25,6 +25,7 @@ export async function createPoll({ question, type, options = [], limitVotes = fa
   const poll = {
     question: question.trim(), type, createdAt: now, createdBy: user.uid,
     limitVotes: type === 'video_collab' ? true : Boolean(limitVotes),
+    submissionCount: 0,
     submissionClosesAt: type === 'video_collab' ? closeAt(submissionDurationHours) : null,
     votingClosesAt,
   };
@@ -67,11 +68,12 @@ export async function hasVoted(pollId) {
 
 export async function submitVideo(pollId, videoId, title) {
   const user = await ensureSignedIn();
-  await writeBatch(db)
-    .set(doc(db, 'polls', pollId, 'submissions', user.uid), {
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'polls', pollId, 'submissions', user.uid), {
       videoId, title: title.slice(0, 256), votes: 0, submittedAt: serverTimestamp()
-    })
-    .commit();
+    });
+  batch.update(doc(db, 'polls', pollId), { submissionCount: increment(1) });
+  await batch.commit();
 }
 
 export async function castVote(pollId, choiceCollection, choiceId) {

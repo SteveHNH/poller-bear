@@ -45,8 +45,7 @@ async function loadPoll() {
         const own = await getOwnSubmission(id);
         hasSubmitted = Boolean(own);
         responseData = own ? [own] : [];
-        // The count is deliberately not read: Rules keep others' submissions private.
-        submissionCount = own ? 1 : 0;
+        submissionCount = poll.submissionCount || 0;
       } else {
         const collection = poll.type === 'video_collab' ? 'submissions' : 'options';
         unsubscribeChoices = subscribeChoices(id, collection, (choices) => {
@@ -106,6 +105,7 @@ async function submitVideo() {
     await saveVideoSubmission(id, videoId, title);
     hasSubmitted = true;
     responseData = [{ id: videoId, videoId, title, votes: 0 }];
+    submissionCount += 1;
     videoUrl = "";
   } catch (err) {
     submitError = err.message || "Unable to submit this video.";
