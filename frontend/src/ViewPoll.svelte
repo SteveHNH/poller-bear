@@ -1,7 +1,9 @@
 <script>
-import { onMount } from "svelte";
+import { onMount, onDestroy } from "svelte";
 import { navigate } from "svelte-routing";
 import VideoEmbed from "./VideoEmbed.svelte";
+import { castVote, getOwnSubmission, hasVoted as didVote, phaseFor, subscribeChoices, subscribePoll, submitVideo as saveVideoSubmission } from './lib/polls';
+import { titleForVideo, videoIdFromUrl } from './lib/youtube';
 
 export let id;
 
@@ -20,75 +22,69 @@ let submissionCount = 0;
 let videoUrl = "";
 let submitError = "";
 let isSubmittingVideo = false;
+let unsubscribePoll = () => {};
+let unsubscribeChoices = () => {};
+let phaseTimer;
 
 $: isCollab = pollData && pollData.type === "video_collab";
-$: ownSubmission = isCollab && pollData.responses.length > 0 ? pollData.responses[0] : null;
+$: ownSubmission = isCollab && responseData.length > 0 ? responseData[0] : null;
 
 async function loadPoll() {
   try {
-    const response = await fetch(`/api/${id}`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
+    hasVoted = await didVote(id);
+    unsubscribePoll = subscribePoll(id, async (poll) => {
+      if (!poll) {
         loadingError = "Poll not found. It may have been deleted or the link is incorrect.";
-      } else {
-        loadingError = "Failed to load poll. Please try again later.";
+        isLoading = false;
+        return;
       }
-      return;
-    }
-
-    const data = await response.json();
-
-    // Handle new response format
-    if (data.poll) {
-      pollData = data.poll;
-      hasVoted = data.has_voted || false;
-    } else {
-      // Handle old format for backwards compatibility
-      pollData = data;
-      hasVoted = false;
-    }
-
-    phase = data.phase || "voting";
-    hasSubmitted = data.has_submitted || false;
-    submissionCount = data.submission_count || 0;
-
-    responseData = pollData.responses.map(r => ({ label: r.text, value: r.id }));
+      pollData = poll;
+      phase = phaseFor(poll);
+      unsubscribeChoices();
+      if (poll.type === 'video_collab' && phase === 'submission') {
+        const own = await getOwnSubmission(id);
+        hasSubmitted = Boolean(own);
+        responseData = own ? [own] : [];
+        submissionCount = poll.submissionCount || 0;
+      } else {
+        const collection = poll.type === 'video_collab' ? 'submissions' : 'options';
+        unsubscribeChoices = subscribeChoices(id, collection, (choices) => {
+          responseData = choices;
+          submissionCount = choices.length;
+        }, fail);
+      }
+      isLoading = false;
+    }, fail);
   } catch (error) {
-    loadingError = "Network error. Please check your connection and try again.";
+    loadingError = error.message || "Unable to load this poll.";
     console.error("Error loading poll:", error);
   } finally {
     isLoading = false;
   }
 }
 
-onMount(loadPoll);
+function fail(error) {
+  loadingError = error.message || "Unable to load this poll.";
+  isLoading = false;
+}
+
+onMount(() => {
+  loadPoll();
+  // Time boundaries do not change the poll document, so refresh listeners when one passes.
+  phaseTimer = window.setInterval(() => {
+    if (pollData && phaseFor(pollData) !== phase) window.location.reload();
+  }, 30000);
+});
+onDestroy(() => { unsubscribePoll(); unsubscribeChoices(); window.clearInterval(phaseTimer); });
 
 async function submitVotes() {
   try {
     errorMessage = "";
-    const response = await fetch(`/api/${id}/vote`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ response_id: selectedOption }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      navigate(`/polls/${id}/r`);
-    } else if (response.status === 409) {
-      // User already voted
-      errorMessage = data.error || "You have already voted on this poll";
-      hasVoted = true;
-    } else {
-      errorMessage = data.error || "Failed to submit vote";
-      console.error('Failed to submit votes:', data.error);
-    }
+    await castVote(id, isCollab ? 'submissions' : 'options', selectedOption);
+    hasVoted = true;
+    navigate(`/polls/${id}/r`);
   } catch (err) {
-    errorMessage = "Network error occurred";
+    errorMessage = err.message || "Unable to submit your vote.";
     console.error('Error:', err);
   }
 }
@@ -103,27 +99,16 @@ async function submitVideo() {
   isSubmittingVideo = true;
 
   try {
-    const response = await fetch(`/api/${id}/submit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ video_url: videoUrl.trim() }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      videoUrl = "";
-      await loadPoll();
-    } else if (response.status === 409) {
-      hasSubmitted = true;
-      submitError = data.error || "You have already submitted a video to this poll";
-    } else {
-      submitError = data.error || "Failed to submit video";
-    }
+    const videoId = videoIdFromUrl(videoUrl.trim());
+    if (!videoId) throw new Error('Enter a supported HTTPS YouTube URL.');
+    const title = await titleForVideo(videoId);
+    await saveVideoSubmission(id, videoId, title);
+    hasSubmitted = true;
+    responseData = [{ id: videoId, videoId, title, votes: 0 }];
+    submissionCount += 1;
+    videoUrl = "";
   } catch (err) {
-    submitError = "Network error occurred";
+    submitError = err.message || "Unable to submit this video.";
     console.error('Error:', err);
   } finally {
     isSubmittingVideo = false;
@@ -171,7 +156,7 @@ async function sharePoll() {
       <div class="poll-header">
         <div class="poll-title-section">
           <h1 class="poll-question">{pollData.question}</h1>
-          {#if pollData.limit_votes}
+          {#if pollData.limitVotes}
             <span class="badge">One vote per person</span>
           {/if}
         </div>
@@ -194,9 +179,8 @@ async function sharePoll() {
             {#if ownSubmission}
               <div class="own-submission">
                 <VideoEmbed
-                  videoId={ownSubmission.video_id}
-                  title={ownSubmission.text}
-                  thumbnailUrl={ownSubmission.thumbnail_url}
+                  videoId={ownSubmission.videoId}
+                  title={ownSubmission.title}
                 />
               </div>
             {/if}
@@ -230,7 +214,7 @@ async function sharePoll() {
             View results
           </button>
         </div>
-      {:else if pollData.limit_votes && hasVoted}
+      {:else if pollData.limitVotes && hasVoted}
         <div class="voted-state">
           <p class="voted-text">Thanks for voting! Your response has been recorded.</p>
           <button class="primary-button" on:click={goToResults}>
@@ -240,12 +224,12 @@ async function sharePoll() {
       {:else}
         <form on:submit|preventDefault={submitVotes} class="poll-form">
           <div class="options-container" class:video-options={isCollab}>
-            {#each responseData as option, index (option.value)}
-              <label class="poll-option" class:selected={selectedOption === option.value}>
+            {#each responseData as option, index (option.id)}
+              <label class="poll-option" class:selected={selectedOption === option.id}>
                 <input
                   type="radio"
                   bind:group={selectedOption}
-                  value={option.value}
+                  value={option.id}
                   class="hidden-radio"
                 />
                 <div class="option-content">
@@ -253,13 +237,12 @@ async function sharePoll() {
                   {#if isCollab}
                     <div class="video-option-content">
                       <VideoEmbed
-                        videoId={pollData.responses[index].video_id}
-                        title={option.label}
-                        thumbnailUrl={pollData.responses[index].thumbnail_url}
+                        videoId={option.videoId}
+                        title={option.title}
                       />
                     </div>
                   {:else}
-                    <span class="option-text">{option.label}</span>
+                    <span class="option-text">{option.text}</span>
                   {/if}
                 </div>
               </label>

@@ -1,7 +1,9 @@
 <script>
 import { navigate } from "svelte-routing";
+import { createPoll, MAX_DURATION_HOURS } from './lib/polls';
 
     const MAX_OPTIONS = 10;
+    const MAX_DURATION = MAX_DURATION_HOURS;
 
     let question = "";
     let responses = ["", ""];
@@ -46,45 +48,18 @@ import { navigate } from "svelte-routing";
       isSubmitting = true;
 
       try {
-        const requestBody = {
+        const validOptions = responses.filter(response => Boolean(response.trim()));
+        const pollId = await createPoll({
           question,
           type: pollType,
-        };
-
-        if (isCollab) {
-          requestBody.submission_duration_hours = parseInt(submissionDurationHours);
-          requestBody.duration_hours = parseInt(durationHours);
-        } else {
-          const validOptions = responses.filter(response => Boolean(response.trim()));
-          requestBody.limit_votes = limitVotes;
-          requestBody.responses = validOptions.map(text => ({ text }));
-
-          // Add duration_hours if specified
-          if (durationHours && durationHours > 0) {
-            requestBody.duration_hours = parseInt(durationHours);
-          }
-        }
-
-        const response = await fetch("/api/create", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(requestBody)
+          options: validOptions,
+          limitVotes,
+          submissionDurationHours: isCollab ? Number(submissionDurationHours) : null,
+          votingDurationHours: durationHours ? Number(durationHours) : null,
         });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          // Success - navigate to the new poll
-          navigate(`/polls/${data.id}`);
-        } else {
-          // Server validation error
-          errorMessage = data.error || "Failed to create poll. Please try again.";
-        }
+        navigate(`/polls/${pollId}`);
       } catch (error) {
-        // Network or other error
-        errorMessage = "Network error. Please check your connection and try again.";
+        errorMessage = error.message || "Unable to create the poll. Please try again.";
         console.error("Error creating poll:", error);
       } finally {
         isSubmitting = false;
@@ -150,7 +125,7 @@ import { navigate } from "svelte-routing";
                 id="submission-duration-input"
                 type="number"
                 min="1"
-                max="8760"
+                max={MAX_DURATION}
                 bind:value={submissionDurationHours}
                 placeholder="e.g., 48 for 2 days"
                 class="duration-input"
@@ -164,7 +139,7 @@ import { navigate } from "svelte-routing";
                 id="voting-duration-input"
                 type="number"
                 min="1"
-                max="8760"
+                max={MAX_DURATION}
                 bind:value={durationHours}
                 placeholder="e.g., 96 for 4 days"
                 class="duration-input"
@@ -227,7 +202,7 @@ import { navigate } from "svelte-routing";
                 id="duration-input"
                 type="number"
                 min="1"
-                max="8760"
+                max={MAX_DURATION}
                 bind:value={durationHours}
                 placeholder="Duration in hours (e.g., 24 for 1 day)"
                 class="duration-input"

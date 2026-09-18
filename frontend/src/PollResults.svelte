@@ -2,13 +2,16 @@
 import { onMount, onDestroy } from 'svelte';
 import { navigate } from "svelte-routing";
 import VideoEmbed from "./VideoEmbed.svelte";
+import { phaseFor, subscribeChoices, subscribePoll } from './lib/polls';
 
 export let id;
 
 let pollData = null;
 let totalVotes = 0;
-let intervalId;
 let shareMessage = "";
+let responses = [];
+let unsubscribePoll = () => {};
+let unsubscribeChoices = () => {};
 
 $: isCollab = pollData && pollData.type === "video_collab";
 
@@ -29,31 +32,23 @@ async function sharePoll() {
 }
 
 
-const fetchPollResults = async () => {
-  const response = await fetch(`/api/${id}`);
-  const data = await response.json()
-  pollData = data.poll
-
-  let responseVotes = 0
-
-  for (let response of pollData.responses) {
-    responseVotes = responseVotes += response.votes
-  };
-
-  if(responseVotes > totalVotes) {
-    totalVotes = responseVotes
-  }
-}
-
 onMount(() => {
-  fetchPollResults();
-  intervalId = setInterval(fetchPollResults, 5000);
+  unsubscribePoll = subscribePoll(id, (poll) => {
+    pollData = poll;
+    unsubscribeChoices();
+    if (!poll || (poll.type === 'video_collab' && phaseFor(poll) === 'submission')) {
+      responses = [];
+      return;
+    }
+    unsubscribeChoices = subscribeChoices(id, poll.type === 'video_collab' ? 'submissions' : 'options', (choices) => {
+      responses = choices;
+      totalVotes = choices.reduce((total, choice) => total + choice.votes, 0);
+    });
+  });
 });
 
 
-onDestroy(() => {
-  clearInterval(intervalId);
-});
+onDestroy(() => { unsubscribePoll(); unsubscribeChoices(); });
 
 </script>
 
@@ -81,7 +76,7 @@ onDestroy(() => {
 
       <div class="results-content">
         <div class="results-grid">
-          {#each pollData.responses.sort((a, b) => b.votes - a.votes) as response, index (response.id)}
+          {#each responses.slice().sort((a, b) => b.votes - a.votes) as response, index (response.id)}
             <div class="result-item" class:winner={index === 0 && response.votes > 0}>
               <div class="result-header">
                 <div class="result-ranking">#{index + 1}</div>
@@ -89,9 +84,8 @@ onDestroy(() => {
                   {#if isCollab}
                     <div class="result-video">
                       <VideoEmbed
-                        videoId={response.video_id}
-                        title={response.text}
-                        thumbnailUrl={response.thumbnail_url}
+                        videoId={response.videoId}
+                        title={response.title}
                       />
                     </div>
                   {:else}
@@ -128,7 +122,7 @@ onDestroy(() => {
         {/if}
 
         <div class="results-footer">
-          Results update automatically every 5 seconds
+          Results update live
         </div>
       </div>
     </div>
