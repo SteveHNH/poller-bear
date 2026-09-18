@@ -31,7 +31,7 @@
     <div class="footer-bottom">
       <div class="footer-divider"></div>
       <div class="bottom-content">
-        <span class="footer-meta">© 2025 Poller Bear</span>
+        <span class="footer-meta">© 2026 Poller Bear</span>
         <span class="footer-meta">Open source. Patches welcome.</span>
       </div>
     </div>
