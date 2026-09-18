@@ -186,7 +186,7 @@ async function sharePoll() {
             {/if}
           {:else}
             <form on:submit|preventDefault={submitVideo} class="submit-video-form">
-              <label class="sub-label" for="video-url-input">Paste a YouTube link</label>
+              <label class="sub-label" for="video-url-input">Submit a song from YouTube</label>
               <input
                 id="video-url-input"
                 type="text"
@@ -198,7 +198,7 @@ async function sharePoll() {
                 <div class="error-notification">{submitError}</div>
               {/if}
               <button type="submit" disabled={isSubmittingVideo} class="primary-button">
-                {isSubmittingVideo ? 'Submitting…' : 'Submit video'}
+                {isSubmittingVideo ? 'Submitting…' : 'Submit song'}
               </button>
             </form>
           {/if}

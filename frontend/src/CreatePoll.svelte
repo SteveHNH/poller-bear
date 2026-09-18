@@ -96,26 +96,31 @@ import { createPoll, MAX_DURATION_HOURS } from './lib/polls';
             class:active={pollType === "video_collab"}
             on:click={() => pollType = "video_collab"}
           >
-            Collaborative video poll
+            Collaborative music poll
           </button>
         </div>
       </div>
 
       <!-- Question Section -->
       <div class="form-section">
+        {#if isCollab}
+          <p class="mode-description">
+            Build a shared playlist by inviting people to submit songs from YouTube, then vote on the one everyone should hear.
+          </p>
+        {/if}
         <label class="section-label" for="question-input">Question</label>
         <input
           id="question-input"
           type="text"
           aria-label="Question Field"
           bind:value={question}
-          placeholder="e.g., What's your favorite programming language?"
+          placeholder={isCollab ? "e.g., What song should we play next?" : "e.g., What's your favorite programming language?"}
           class="question-input"
         />
       </div>
 
       {#if isCollab}
-        <!-- Collaborative Video Poll Settings -->
+        <!-- Collaborative Music Poll Settings -->
         <div class="form-section">
           <span class="section-label">Submission &amp; voting windows</span>
           <div class="settings-content">
@@ -130,7 +135,7 @@ import { createPoll, MAX_DURATION_HOURS } from './lib/polls';
                 placeholder="e.g., 48 for 2 days"
                 class="duration-input"
               />
-              <span class="checkbox-description">Anyone with the link can submit a YouTube video until this closes</span>
+              <span class="checkbox-description">Anyone with the link can submit a song from YouTube until this closes</span>
             </div>
 
             <div class="duration-setting">
@@ -292,6 +297,13 @@ import { createPoll, MAX_DURATION_HOURS } from './lib/polls';
   .question-input {
     font-size: 1rem;
     padding: 0.85em 1em;
+  }
+
+  .mode-description {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
 
   .poll-type-toggle {
