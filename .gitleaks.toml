@@ -1,0 +1,7 @@
+[allowlist]
+description = "Global Allowlist"
+
+regexes = [
+  # Firebase web API keys are public client configuration, not secret credentials.
+  '''apiKey:"AIzaSyB_hkTBhFY0Xnmawr23VYaTzPFic-Wv7Us"''',
+]
