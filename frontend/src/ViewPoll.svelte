@@ -28,6 +28,23 @@ let phaseTimer;
 
 $: isCollab = pollData && pollData.type === "video_collab";
 $: ownSubmission = isCollab && responseData.length > 0 ? responseData[0] : null;
+$: submissionClosesAt = pollData && pollData.submissionClosesAt;
+$: votingClosesAt = pollData && pollData.votingClosesAt;
+
+function formatDeadline(timestamp) {
+  if (!timestamp) return "No end time set";
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function deadlineDateTime(timestamp) {
+  if (!timestamp) return "";
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toISOString();
+}
 
 async function loadPoll() {
   try {
@@ -170,6 +187,19 @@ async function sharePoll() {
 
       {#if shareMessage}
         <div class="share-notification">{shareMessage}</div>
+      {/if}
+
+      {#if isCollab && phase !== "closed"}
+        <div class="deadline-panel" aria-live="polite">
+          {#if phase === "submission"}
+            <span class="deadline-label">Submissions close</span>
+            <time datetime={deadlineDateTime(submissionClosesAt)}>{formatDeadline(submissionClosesAt)}</time>
+            <p>Voting begins when the submission window closes.</p>
+          {:else}
+            <span class="deadline-label">Voting closes</span>
+            <time datetime={deadlineDateTime(votingClosesAt)}>{formatDeadline(votingClosesAt)}</time>
+          {/if}
+        </div>
       {/if}
 
       {#if isCollab && phase === "submission"}
@@ -385,6 +415,37 @@ async function sharePoll() {
     font-weight: 500;
   }
 
+  .deadline-panel {
+    margin: 1.25rem 2rem 0;
+    padding: 1rem 1.1rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .deadline-label {
+    display: block;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .deadline-panel time {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .deadline-panel p {
+    margin: 0.35rem 0 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
   .voted-state {
     text-align: center;
     padding: 3rem 2rem;
@@ -559,6 +620,11 @@ async function sharePoll() {
 
     .poll-form {
       padding: 1.5rem 1.25rem 1.5rem 1.25rem;
+    }
+
+    .deadline-panel {
+      margin-left: 1.25rem;
+      margin-right: 1.25rem;
     }
 
     .action-buttons {
