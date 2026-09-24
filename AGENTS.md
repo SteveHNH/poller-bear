@@ -56,7 +56,12 @@ npm install          # Install dependencies
 npm run dev          # Development server with live reload
 npm run build        # Production build
 npm run start        # Serve production build
+npx firebase deploy --project poller-bear-sadams --only hosting # Deploy Hosting with the local CLI
 ```
+
+Use the project-local Firebase CLI (`npx firebase` from `frontend/`) for Firebase
+commands. Do not use the system-installed `firebase` command; its current version
+has a module-loading issue in this environment.
 
 #### Backend
 ```bash
